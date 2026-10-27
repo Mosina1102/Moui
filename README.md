@@ -1,188 +1,69 @@
-# Moui！MaiCore-MaiMBot (编辑中)
-<br />
-<div align="center">
-
-  ![Python Version](https://img.shields.io/badge/Python-3.10+-blue)
-  ![License](https://img.shields.io/github/license/SengokuCola/MaiMBot?label=协议)
-  ![Status](https://img.shields.io/badge/状态-开发中-yellow)
-  ![Contributors](https://img.shields.io/github/contributors/MaiM-with-u/MaiBot.svg?style=flat&label=贡献者)
-  ![forks](https://img.shields.io/github/forks/MaiM-with-u/MaiBot.svg?style=flat&label=分支数)
-  ![stars](https://img.shields.io/github/stars/MaiM-with-u/MaiBot?style=flat&label=星标数)
-  ![issues](https://img.shields.io/github/issues/MaiM-with-u/MaiBot)
-
-  </div>
+# Moui（墨忆）
 
 <p align="center">
-  <a href="https://github.com/MaiM-with-u/MaiBot/">
-    <img src="depends-data/maimai.png" alt="Logo" style="width: 200px">
-  </a>
-  <br />
-  <a href="https://space.bilibili.com/1344099355">
-    画师：略nd
-  </a>
-
-  <h3 align="center">MaiBot(Moui)</h3>
-  <p align="center">
-    一款专注于<strong> 群组聊天 </strong>的赛博网友
-    <br />
-    <a href="https://docs.mai-mai.org"><strong>探索本项目的文档 »</strong></a>
-    <br />
-    <br />
-    <!-- <a href="https://github.com/shaojintian/Best_README_template">查看Demo</a>
-    · -->
-    <a href="https://github.com/MaiM-with-u/MaiBot/issues">报告Bug</a>
-    ·
-    <a href="https://github.com/MaiM-with-u/MaiBot/issues">提出新特性</a>
-  </p>
+  <strong>拟真陪伴智能体 —— 墨写的记忆，会成长的心。</strong><br>
+  当前版本：Moui-Mmax
 </p>
 
-## 新版0.6.x部署前先阅读：https://docs.mai-mai.org/manual/usage/mmc_q_a
+<p align="center">
+  ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
+  ![Python](https://img.shields.io/badge/Python-3.12+-blue)
+  ![Status](https://img.shields.io/badge/状态-单飞纪元开始-orange)
+</p>
 
+---
 
-## 📝 项目简介
+## 她是谁
 
-**🍔MaiCore是一个基于大语言模型的可交互智能体**
+Moui 是一个住在 QQ 里的智能体。不是"你问它答的助手"，而是一个努力活得像人的角色：
 
+- **真实的心情**——二维情绪空间（愉悦度×唤醒度）真实运转：激动时打字变快，被夸了语气会飘，玩梗接顺了会小得意
+- **主动找你**——沉默久了"想找人说话的冲动"会累积，掷骰命中就来搭话；晾着她，她会识趣收声
+- **自己的生活**——刷空间、点赞评论、发说说、改签名、上网查资料、找图分享
+- **听得懂、说得出**——语音自动转文字理解，回复用克隆音色直接说
+- **真 @ 真引用**——蓝字 at，手机真的会弹提醒
+- **说错话会变好**——每条回复发送前独立审核模型把关，被打回的原因她会记住，第二天更会说话
+- **记得你**——人物卡记着对你的印象、相处方式、雷点和你们的事件时间线；共同经历归档成"共同回忆"，想起过的记忆忘得更慢
 
-- 💭 **智能对话系统**：基于LLM的自然语言交互
-- 🤔 **实时思维系统**：模拟人类思考过程
-- 💝 **情感表达系统**：丰富的表情包和情绪表达
-- 🧠 **持久记忆系统**：基于MongoDB的长期记忆存储
-- 🔄 **动态人格系统**：自适应的性格特征
+## 快速开始（一键包）
 
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1amAneGE3P" target="_blank">
-    <img src="depends-data/video.png" style="max-width: 200px" alt="Moui演示视频">
-    <br>
-    👆 点击观看Moui演示视频 👆
-</a>
-</div>
+1. 运行 `第一次启动点我！！！.bat`（自动装 Python 依赖、生成配置）
+2. 编辑 `config\bot_config.toml`：填 QQ 号、人设；`config\.env` 填模型 key
+3. 运行 `napcat\napcat.quick.bat` 登录 QQ
+4. 运行 `启动点我！！！.bat`——数据库和主程序自动拉起
 
+> 语音功能：去硅基流动 CosyVoice2 创建属于她的音色，把 URI 填进 `[tts] voice_uri`。
+> 监控看板：浏览器打开 `/dashboard`，token 默认空=只读模式。
 
-### 📢 版本信息
+## 文档
 
-**最新版本: v0.6.3** ([查看更新日志](changelogs/changelog.md))
-> [!WARNING]
-> 请阅读教程后更新！！！！！！！
-> 请阅读教程后更新！！！！！！！
-> 请阅读教程后更新！！！！！！！
-> 次版本MaiBot将基于MaiCore运行，不再依赖于nonebot相关组件运行。
-> MaiBot将通过nonebot的插件与nonebot建立联系，然后nonebot与QQ建立联系，实现MaiBot与QQ的交互
+- [Moui 介绍与对比](Moui介绍与对比.md)——全景介绍、20 维度源码级对比、六大原创系统、设计哲学
 
-**分支说明：**
-- `main`: 稳定发布版本
-- `dev`: 开发测试版本（不知道什么意思就别下）
-- `classical`: 0.6.0之前的版本
+## 设计哲学
 
+**官方在卷"记住更多"，Moui 在卷"用反馈改行为"。**
 
+- 情绪不是 prompt 演出来的，是内部状态机驱动的
+- 审核不是单向闸门，是带复盘的教学闭环
+- 记忆不是检索运气，是在场人物的定向认知
+- 混乱发生在人格层，护栏立在行为层——**可控混乱是人味的核心**
 
-> [!WARNING]
-> - 项目处于活跃开发阶段，代码可能随时更改
-> - 文档未完善，有问题可以提交 Issue 或者 Discussion
-> - QQ机器人存在被限制风险，请自行了解，谨慎使用
-> - 由于持续迭代，可能存在一些已知或未知的bug
-> - 由于开发中，可能消耗较多token
+## 血统与致敬
 
-### ⚠️ 重要提示
+Moui 基于官方 [MaiBot](https://github.com/MaiM-with-u/MaiBot) 0.6.3 骨架（GPL-3.0）改造，版本史 M1 → M4 → Mmax → Moui。
 
-- 升级到v0.6.x版本前请务必阅读：[升级指南](https://docs.mai-mai.org/manual/usage/mmc_q_a)
-- 本版本基于MaiCore重构，通过nonebot插件与QQ平台交互
-- 项目处于活跃开发阶段，功能和API可能随时调整
+> 官方作者千石可乐的设计理念，Moui 全盘承接并继续走了下去：
+> "这个项目的目的并不是为了写一个功能齐全的机器人，而是一个尽可能让人感知到真实的类人存在。"
+> "最像而不是好。如果人类真的需要一个 AI 来陪伴自己……而是一个会犯错的、拥有自己感知和想法的'生命形式'。"
 
-### 💬交流群（开发和建议相关讨论）不一定有空回复，会优先写文档和代码
-- [一群](https://qm.qq.com/q/VQ3XZrWgMs) 766798517 
-- [二群](https://qm.qq.com/q/RzmCiRtHEW) 571780722
-- [五群](https://qm.qq.com/q/JxvHZnxyec) 1022489779
-- [三群](https://qm.qq.com/q/wlH5eT8OmQ) 1035228475【已满】
-- [四群](https://qm.qq.com/q/wlH5eT8OmQ) 729957033【已满】
+官方 1.0 移除了情绪系统、走向平台化；Moui 从 0.6.3 扎营，把"像不像人"这条路走到了今天。
 
+## 须知
 
-<div align="left">
-<h2>📚 文档 </h2>
-</div>
+- 本应用生成内容来自 AI 模型，请仔细甄别，勿用于违反法律的用途
+- QQ 机器人存在被限制风险，请自行了解、谨慎使用
+- 持续运行会消耗 LLM token，请注意成本
 
-### (部分内容可能过时，请注意版本对应)
+## 协议
 
-### 核心文档
-- [📚 核心Wiki文档](https://docs.mai-mai.org) - 项目最全面的文档中心，你可以了解Moui有关的一切
-
-### 最新版本部署教程(MaiCore版本)
-- [🚀 最新版本部署教程](https://docs.mai-mai.org/manual/deployment/mmc_deploy_windows.html) - 基于MaiCore的新版本部署方式（与旧版本不兼容）
-
-
-## 🎯 0.6.3 功能介绍
-
-| 模块       | 主要功能                                                             | 特点    |
-|----------|------------------------------------------------------------------|-------|
-| 💬 聊天系统  | • **统一调控不同回复逻辑**<br>• 智能交互模式 (普通聊天/专注聊天)<br>• 关键词主动发言<br>• 多模型支持<br>• 动态prompt构建<br>• 私聊功能(PFC)增强 | 拟人化交互 |
-| 🧠 心流系统  | • 实时思考生成<br>• **智能状态管理**<br>• **概率回复机制**<br>• 自动启停机制<br>• 日程系统联动<br>• **上下文感知工具调用** | 智能化决策 |
-| 🧠 记忆系统  | • **记忆整合与提取**<br>• 海马体记忆机制<br>• 聊天记录概括 | 持久化记忆 |
-| 😊 表情系统  | • **全新表情包系统**<br>• **优化选择逻辑**<br>• 情绪匹配发送<br>• GIF支持<br>• 自动收集与审查 | 丰富表达  |
-| 📅 日程系统  | • 动态日程生成<br>• 自定义想象力<br>• 思维流联动                                  | 智能规划  |
-| 👥 关系系统  | • **工具调用动态更新**<br>• 关系管理优化<br>• 丰富接口支持<br>• 个性化交互         | 深度社交  |
-| 📊 统计系统  | • 使用数据统计<br>• LLM调用记录<br>• 实时控制台显示                               | 数据可视  |
-| 🛠️ 工具系统 | • **LPMM知识库集成**<br>• **上下文感知调用**<br>• 知识获取工具<br>• 自动注册机制<br>• 多工具支持 | 扩展功能  |
-| 📚 **知识库(LPMM)** | • **全新LPMM系统**<br>• **强大的信息检索能力**                             | 知识增强 |
-| ✨ **昵称系统** | • **自动为群友取昵称**<br>• **降低认错人概率** (早期阶段)                      | 身份识别 |
-
-## 📐 项目架构
-
-```mermaid
-graph TD
-    A[MaiCore] --> B[对话系统]
-    A --> C[心流系统]
-    A --> D[记忆系统]
-    A --> E[情感系统]
-    B --> F[多模型支持]
-    B --> G[动态Prompt]
-    C --> H[实时思考]
-    C --> I[日程联动]
-    D --> J[记忆存储]
-    D --> K[记忆检索]
-    E --> L[表情管理]
-    E --> M[情绪识别]
-```
-
-## ✍️如何给本项目报告BUG/提交建议/做贡献
-
-MaiCore是一个开源项目，我们非常欢迎你的参与。你的贡献，无论是提交bug报告、功能需求还是代码pr，都对项目非常宝贵。我们非常感谢你的支持！🎉 但无序的讨论会降低沟通效率，进而影响问题的解决速度，因此在提交任何贡献前，请务必先阅读本项目的[贡献指南](depends-data/CONTRIBUTE.md)（待补完）
-
-
-
-## 设计理念（原始时代的火花）
-
-> **千石可乐说：**
-> - 这个项目最初只是为了给牛牛bot添加一点额外的功能，但是功能越写越多，最后决定重写。其目的是为了创造一个活跃在QQ群聊的"生命体"。可以目的并不是为了写一个功能齐全的机器人，而是一个尽可能让人感知到真实的类人存在。
-> - 程序的功能设计理念基于一个核心的原则："最像而不是好"
-> - 如果人类真的需要一个AI来陪伴自己，并不是所有人都需要一个完美的，能解决所有问题的"helpful assistant"，而是一个会犯错的，拥有自己感知和想法的"生命形式"。
-> - 代码会保持开源和开放，但个人希望MaiMbot的运行时数据保持封闭，尽量避免以显式命令来对其进行控制和调试.我认为一个你无法完全掌控的个体才更能让你感觉到它的自主性，而视其成为一个对话机器.
-> - SengokuCola~~纯编程外行，面向cursor编程，很多代码写得不好多多包涵~~已得到大脑升级
-
-
-## 📌 注意事项
-
-> [!WARNING]
-> 使用本项目前必须阅读和同意用户协议和隐私协议
-> 本应用生成内容来自人工智能模型，由 AI 生成，请仔细甄别，请勿用于违反法律的用途，AI生成内容不代表本人观点和立场。
-
-## 致谢
-
-- [NapCat](https://github.com/NapNeko/NapCatQQ): 现代化的基于 NTQQ 的 Bot 协议端实现  
-
-## Moui仓库状态
-
-![Alt](https://repobeats.axiom.co/api/embed/9faca9fccfc467931b87dd357b60c6362b5cfae0.svg "Repobeats analytics image")
-
-### 贡献者
-
-感谢各位大佬！
-
-<a href="https://github.com/MaiM-with-u/MaiBot/graphs/contributors">
-  <img alt="contributors" src="https://contrib.rocks/image?repo=MaiM-with-u/MaiBot" />
-</a>
-
-**也感谢每一位给Moui发展提出宝贵意见与建议的用户，感谢陪伴Moui走到现在的你们**
-
-## Stargazers over time
-
-[![Stargazers over time](https://starchart.cc/MaiM-with-u/MaiBot.svg?variant=adaptive)](https://starchart.cc/MaiM-with-u/MaiBot)
+[GPL-3.0](LICENSE) —— 代码开源，血统诚实。
