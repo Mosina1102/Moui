@@ -229,7 +229,7 @@ Moui 的做法本质上是在**不改模型权重的前提下训练 agent**—�
 
 | 赛道 | 头部项目 | 与 Moui 的关系 |
 |---|---|---|
-| IM 助手/Agent 平台 | AstrBot（41.6K★）、LangBot（18K★）、QwenPaw、OpenClaw | 不同物种：助理框架 vs 角色。拿它们攒陪伴=重新发明简配麦麦 |
+| IM 助手/Agent 平台 | AstrBot（41.6K★）、LangBot（18K★）、QwenPaw、OpenClaw | 不同物种：助理框架 vs 角色。拿它们攒陪伴=重新发明简配版同类 |
 | AI 伴侣（自托管） | HerAndHim（Telegram 私聊）、SillyTavern | 形态相近但不在 QQ 群聊生态；HerAndHim 的"真实日程"设计值得借鉴 |
 | 虚拟主播/陪玩 | airi（Neuro-sama 系） | 形象+游戏陪玩，不进群聊 |
 | **QQ 群聊拟人** | MaiBot 系（官方+魔改生态） | **Moui 赛道，开源圈无同量级竞品** |
