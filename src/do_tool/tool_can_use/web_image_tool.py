@@ -121,11 +121,14 @@ class WebImageTool(BaseTool):
         "上网找一张图发给对方看（表情包/梗图/实物图/壁纸等）。"
         "当你想给对方看一个画面、配一张图表达情绪、对方问你'长什么样'时调用。"
         "query 用具体的画面描述词。图片会自动搜索、审核并发送到当前聊天，返回图片内容描述。"
+        "发图时想配一句话就填 caption（像平时说话，如'早！给你看个日出'），"
+        "图发出去后你的话会紧跟发出——真人发图都带句话，别光甩图。"
     )
     parameters = {
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "想找什么图的画面描述，如'柴犬歪头表情包'、'冰墩墩图片'"},
+            "caption": {"type": "string", "description": "可选。随图配的一句话（30字内，像平时说话）"},
         },
         "required": ["query"],
     }
@@ -212,6 +215,23 @@ class WebImageTool(BaseTool):
             message.detailed_plain_text = f"[表情包] {desc[:50]}"
             await global_api.send_message(message)
             await MessageStorage().store_message(message, chat_stream)
+
+            # 随图配文（caption）：图发出后紧跟一条她的话——真人发图九成带句词，光甩图像卡了
+            caption = (function_args.get("caption") or "").strip()
+            if caption:
+                cap_message = MessageSending(
+                    message_id=f"webimgcap{round(time.time(), 2)}",
+                    chat_stream=chat_stream,
+                    bot_user_info=bot_user_info,
+                    sender_info=None,
+                    message_segment=Seg(type="text", data=caption[:60]),
+                    reply=None,
+                    is_head=False,
+                    is_emoji=False,
+                )
+                await global_api.send_message(cap_message)
+                await MessageStorage().store_message(cap_message, chat_stream)
+                logger.info(f"[web_image] 随图配文已发送: {caption[:40]}")
         except Exception as e:
             logger.error(f"发送网络图片失败: {e}")
             return {"status": "failed", "message": "图下好了但发送失败了"}

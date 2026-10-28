@@ -23,21 +23,27 @@ PROBS = {
 QUIET_START = 1  # 安静时段 1-8 点不产生冲动（对齐 DSH speak-up）
 QUIET_END = 8
 
-# 冲动池：(注入给Moui的内心话, 对应工具名)
+# 冲动池：(注入给Moui的内心话, 对应工具名)（P6 扩容：+语音/搜索）
 POSITIVE_IMPULSES: List[Tuple[str, str]] = [
     ("有点想发个空间记录一下", "post_qzone"),
     ("今天心情不错，想换个头像", "change_avatar"),
     ("心情挺好，想换个签名", "change_signature"),
+    ("心情不错，想发条语音跟人唠唠", "send_voice"),
+    ("想看看最近有什么新鲜事", "web_search"),
 ]
 NEGATIVE_IMPULSES: List[Tuple[str, str]] = [
     ("心里有点闷，想发个空间说出来", "post_qzone"),
     ("心情不好，想换个签名", "change_signature"),
+    ("想找点乐子转移一下注意力", "web_search"),
 ]
 
 
 def _tool_ready(tool_name: str) -> bool:
     """检查对应工具是否在冷却中（冲动只在工具可用时才产生，避免白注入）"""
     try:
+        if tool_name in ("send_voice", "web_search"):
+            # P6 扩容配套：两工具均无冷却文件，直接放行（send_voice 有发送频率自身兜底）
+            return True
         if tool_name in ("change_avatar", "change_signature", "change_nickname", "send_poke"):
             from ...do_tool.tool_can_use.account_action_common import check_cooldown
 

@@ -378,6 +378,10 @@ def random_remove_punctuation(text: str) -> str:
     return result
 
 
+# 引用功能标记（[引用] / [引用自己] / [引用图] / [引用#n]）——括号清理、分段、错别字处理都要保护它们
+QUOTE_MARKER_RE = re.compile(r"\[引用(?:自己|图|#\d+)?\]")
+
+
 def process_llm_response(text: str, chat_id: Optional[str] = None) -> List[str]:
     # 先保护颜文字
     if global_config.enable_kaomoji_protection:
@@ -387,8 +391,8 @@ def process_llm_response(text: str, chat_id: Optional[str] = None) -> List[str]:
         protected_text = text
         kaomoji_mapping = {}
     # 提取被 () 或 [] 包裹且包含中文的内容
-    # 排除 [引用] / [引用自己] 两个功能标记——它们要在发送链路被转换成原生引用框，不能当括号内容删掉
-    pattern = re.compile(r"[\(\[\（](?!(?:引用\]|引用自己\]))(?=.*[\u4e00-\u9fff]).*?[\)\]\）]")
+    # 排除引用功能标记——它们要在发送链路被转换成原生引用框，不能当括号内容删掉
+    pattern = re.compile(r"[\(\[\（](?!(?:引用(?:自己|图|#\d+)?\]))(?=.*[\u4e00-\u9fff]).*?[\)\]\）]")
     # _extracted_contents = pattern.findall(text)
     _extracted_contents = pattern.findall(protected_text)  # 在保护后的文本上查找
     # 去除 () 和 [] 及其包裹的内容
@@ -421,11 +425,11 @@ def process_llm_response(text: str, chat_id: Optional[str] = None) -> List[str]:
         split_sentences = [cleaned_text]
 
     # 引用标记保护：分段器按空格切分，"[引用] 你好"可能被切成"[引用]"独立段——归并回下一段开头
-    _QUOTE_MARKERS = ("[引用]", "[引用自己]")
+    # （正则覆盖 [引用] / [引用自己] / [引用图] / [引用#n] 全家族）
     fixed_sentences: List[str] = []
     _pending_marker = ""
     for _s in split_sentences:
-        if _s.strip() in _QUOTE_MARKERS:
+        if QUOTE_MARKER_RE.fullmatch(_s.strip()):
             _pending_marker = _s.strip()
             continue
         if _pending_marker:
@@ -453,7 +457,7 @@ def process_llm_response(text: str, chat_id: Optional[str] = None) -> List[str]:
     sentences = []
     for sentence in split_sentences:
         # 含引用标记的句子跳过错别字处理——标记里的字被 typo 替换就废了
-        if global_config.chinese_typo_enable and not any(_m in sentence for _m in _QUOTE_MARKERS):
+        if global_config.chinese_typo_enable and not QUOTE_MARKER_RE.search(sentence):
             typoed_text, typo_corrections = typo_generator.create_typo_sentence(sentence)
             sentences.append(typoed_text)
             if typo_corrections:

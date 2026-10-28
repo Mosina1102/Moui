@@ -20,7 +20,9 @@ logger = get_logger("interest")
 
 # Consider moving log directory/filename constants here
 LOG_DIRECTORY = "logs/interest"
-HISTORY_LOG_FILENAME = "interest_history.log"
+# O7 按月分文件：interest_history_YYYYMM.log，启动/翻月清理只保留最近 HISTORY_KEEP_MONTHS 份
+HISTORY_LOG_PREFIX = "interest_history"
+HISTORY_KEEP_MONTHS = 3
 
 
 class InterestLogger:
@@ -36,8 +38,34 @@ class InterestLogger:
         """
         self.subheartflow_manager = subheartflow_manager
         self.heartflow = heartflow  # 存储 Heartflow 实例
-        self._history_log_file_path = os.path.join(LOG_DIRECTORY, HISTORY_LOG_FILENAME)
+        self._history_month = ""  # O7：当前写文件对应的月份（翻月自动切换并触发清理）
         self._ensure_log_directory()
+        self._cleanup_old_history_logs()
+
+    def _current_history_path(self) -> str:
+        """O7 按月分文件：interest_history_YYYYMM.log（写入处每次调用，跨月自动切换）。"""
+        month = time.strftime("%Y%m")
+        if month != self._history_month:
+            self._history_month = month
+            self._cleanup_old_history_logs()
+        return os.path.join(LOG_DIRECTORY, f"{HISTORY_LOG_PREFIX}_{month}.log")
+
+    def _cleanup_old_history_logs(self) -> None:
+        """O7 清理旧历史日志，只保留最近 HISTORY_KEEP_MONTHS 份。"""
+        try:
+            files = sorted(
+                f
+                for f in os.listdir(LOG_DIRECTORY)
+                if f.startswith(HISTORY_LOG_PREFIX) and f.endswith(".log")
+            )
+            for old in files[:-HISTORY_KEEP_MONTHS] if len(files) > HISTORY_KEEP_MONTHS else []:
+                try:
+                    os.remove(os.path.join(LOG_DIRECTORY, old))
+                    logger.info(f"已清理旧兴趣历史日志: {old}")
+                except Exception as e:
+                    logger.warning(f"清理旧兴趣历史日志失败 {old}: {e}")
+        except Exception as e:
+            logger.warning(f"清理兴趣历史日志异常: {e}")
 
     def _ensure_log_directory(self):
         """确保日志目录存在。"""
@@ -107,7 +135,7 @@ class InterestLogger:
 
             if not all_subflow_states:
                 # logger.debug("没有获取到任何子心流状态，仅记录主心流状态")
-                with open(self._history_log_file_path, "a", encoding="utf-8") as f:
+                with open(self._current_history_path(), "a", encoding="utf-8") as f:
                     f.write(json.dumps(log_entry_base, ensure_ascii=False) + "\n")
                 return
 
@@ -140,11 +168,11 @@ class InterestLogger:
 
             log_entry_base["subflows"] = subflow_details
 
-            with open(self._history_log_file_path, "a", encoding="utf-8") as f:
+            with open(self._current_history_path(), "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_entry_base, ensure_ascii=False) + "\n")
 
         except IOError as e:
-            logger.error(f"写入状态日志到 {self._history_log_file_path} 出错: {e}")
+            logger.error(f"写入状态日志到 {self._current_history_path()} 出错: {e}")
         except Exception as e:
             logger.error(f"记录状态时发生意外错误: {e}")
             logger.error(traceback.format_exc())

@@ -379,10 +379,14 @@ class MessageSending(MessageProcessBase):
             if reply:
                 self.reply = reply
             if self.reply:
-                self.reply_to_message_id = self.reply.message_info.message_id
+                anchor_id = str(self.reply.message_info.message_id or "")
+                # QQ真实消息id必为纯数字——"notice"(戳一拍)/mid_pf_(占位)等引用必失败，降级普通消息
+                if not anchor_id.isdigit():
+                    return self
+                self.reply_to_message_id = anchor_id
                 # 引用段：直接引用对方消息在 QQ 里的真实 id（收到的锚点消息自带）
                 # 适配器会把它转成 OneBot 的 reply 段，QQ 端呈现为原生引用框
-                reply_seg = Seg(type="reply", data=str(self.reply.message_info.message_id))
+                reply_seg = Seg(type="reply", data=anchor_id)
                 self.message_segment = Seg(
                     type="seglist",
                     data=[

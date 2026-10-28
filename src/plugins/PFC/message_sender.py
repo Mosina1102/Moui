@@ -123,7 +123,14 @@ class DirectMessageSender:
                     anchor_text = getattr(reply_to_message, "processed_plain_text", "") or ""
                 from ..moods.mood_llm_judge import spawn_mood_judge
 
-                spawn_mood_judge(anchor_text, [m for m in processed_messages if m.strip()], chat_type="private")
+                spawn_mood_judge(
+                    anchor_text,
+                    [m for m in processed_messages if m.strip()],
+                    chat_type="private",
+                    speaker_uid=str(
+                        getattr(getattr(getattr(reply_to_message, "message_info", None), "user_info", None), "user_id", "") or ""
+                    ),
+                )
             except Exception as e:
                 logger.warning(f"[私聊][{self.private_name}]触发心情判断失败（不影响发送）: {e}")
 

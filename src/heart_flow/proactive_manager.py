@@ -48,10 +48,36 @@ GROUP_COOLDOWN_HOURS = 2  # 命中后每群冷却
 
 TEXT_MAX_LEN = 60  # 主动话题长度上限
 
+# P1 心情系数：低落不想说话（valence<0 线性打折），兴奋话痨略加成（fail-open，情绪不可用 ×1.0）
+MOOD_TALK_LOW_K = 0.5  # 低落线性系数：valence=-1 → ×0.5
+MOOD_TALK_LOW_FLOOR = 0.5  # 低落打折下限
+MOOD_TALK_EXCITE_VALENCE = 0.5  # 兴奋判定：愉悦度门槛
+MOOD_TALK_EXCITE_AROUSAL = 0.3  # 兴奋判定：唤醒度门槛
+MOOD_TALK_HIGH = 1.2  # 兴奋加成：命中线 ×1.2
+# P2 外部挫折→心情：黏人刹车触发时的失落增量（心情的负向只来自外部世界，老大裁决版）
+MOOD_SETBACK_VALENCE = -0.08
+
 
 def _in_quiet_hours() -> bool:
     hour = time.localtime().tm_hour
     return QUIET_START <= hour < QUIET_END
+
+
+def _mood_talk_factor() -> Tuple[float, str]:
+    """P1 心情系数：低落不想说话，开心兴奋话痨（与 P8 willing 联动同一套系数哲学）。
+    返回 (系数, 日志注记)；fail-open：情绪不可用则 ×1.0 不注记。"""
+    try:
+        from ..plugins.moods.moods import MoodManager
+
+        mood = MoodManager.get_instance().get_current_mood()
+        if mood.valence < 0:
+            factor = max(MOOD_TALK_LOW_FLOOR, 1.0 + mood.valence * MOOD_TALK_LOW_K)
+            return factor, f"低落×{factor:.2f}"
+        if mood.valence > MOOD_TALK_EXCITE_VALENCE and mood.arousal > MOOD_TALK_EXCITE_AROUSAL:
+            return MOOD_TALK_HIGH, f"兴奋×{MOOD_TALK_HIGH:.2f}"
+        return 1.0, ""
+    except Exception:
+        return 1.0, ""
 
 
 class ProactiveManager:
@@ -153,11 +179,17 @@ class ProactiveManager:
         bonus = min(GROUP_MISS_BONUS_MAX, miss_streak * GROUP_MISS_BONUS_STEP)
         hitline = min(100, GROUP_BASE_LINE * factor + bonus)
 
+        # P1 心情系数：低落不想说话，兴奋话痨（fail-open，情绪不可用则 ×1.0）
+        mood_factor, mood_note = _mood_talk_factor()
+        if mood_note:
+            hitline = min(100, hitline * mood_factor)
+
         roll = random.randint(1, 100)
         self._last_judge[key] = now  # 判定发生（无论中没中），写判定硬冷却时间戳
         logger.info(
             f"[主动-群] {stream_id} 掷骰 {roll} vs 命中线 {hitline:.0f}"
             f"（基线{GROUP_BASE_LINE}×{factor_note}{factor} + 没中加成{bonus}）兴趣={interest:.1f}"
+            + (f" 心情系数{mood_note}" if mood_note else "")
         )
 
         if roll > hitline:
@@ -287,12 +319,27 @@ class ProactiveManager:
         if last_hit_ts and (not last_other_ts or last_other_ts < last_hit_ts):
             hitline *= 0.3
             factor_note += "·上次主动后TA一直没回应"
+            # P2 外部挫折→心情（老大裁决版）：心情的负向只来自外部世界——被晾着收声，有点失落
+            try:
+                from ..plugins.moods.moods import MoodManager
+
+                MoodManager.get_instance().apply_direct_delta(
+                    MOOD_SETBACK_VALENCE, 0.0, "被晾着收声，有点失落"
+                )
+            except Exception:
+                pass
+
+        # P1 心情系数：低落不想说话，兴奋话痨（fail-open，情绪不可用则 ×1.0）
+        mood_factor, mood_note = _mood_talk_factor()
+        if mood_note:
+            hitline = min(100, hitline * mood_factor)
 
         roll = random.randint(1, 100)
         self._last_judge[key] = now  # 判定发生（无论中没中），写判定硬冷却时间戳
         logger.info(
             f"[主动-私聊] {stream_id} 掷骰 {roll} vs 命中线 {hitline:.0f}"
             f"（基线{PRIVATE_BASE_LINE}×{factor_note}{factor} + 没中加成{bonus}）"
+            + (f" 心情系数{mood_note}" if mood_note else "")
         )
 
         if roll > hitline:
@@ -532,7 +579,28 @@ class ProactiveManager:
                 time_now=time_now,
                 max_rounds=self.IDLE_MAX_ROUNDS,
             )
+            # P4 世界卡进闲逛：让她想起之前在网上看到的东西（空卡不占位，fail-open）
+            world_block = ""
+            try:
+                from ..plugins.self_growth.world_cards import get_world_cards_block
+
+                _recent_topic = ""
+                try:
+                    from ..plugins.utils.chat_message_builder import get_raw_msg_before_timestamp_with_chat
+
+                    _chat_id = self._idle_chat_id_or_first()
+                    if _chat_id:
+                        _msgs = get_raw_msg_before_timestamp_with_chat(chat_id=_chat_id, timestamp=time.time(), limit=10)
+                        _recent_topic = " ".join(str(m.get("processed_plain_text", ""))[:40] for m in _msgs)
+                except Exception:
+                    pass
+                world_block = get_world_cards_block(_recent_topic)
+            except Exception as e:
+                logger.debug(f"[闲逛] 世界卡注入跳过: {e}")
+
             user_text = f"上网吧，想干嘛干嘛。可以分享的对象：{targets_text}"
+            if world_block:
+                user_text += f"\n（你之前在网上了解到这些，想起来了可以再看看相关的新内容）\n{world_block}"
             messages = [
                 {"role": "system", "content": system_text},
                 {"role": "user", "content": user_text},
@@ -549,13 +617,17 @@ class ProactiveManager:
                 }
                 response = await llm._execute_request(endpoint="/chat/completions", payload=payload, prompt=user_text)
 
-                if len(response) == 3:
-                    content, _reasoning, tool_calls = response
+                # 验尸修正：模型层无工具调用返回二元组 (content, reasoning)、有工具调用返回三元组
+                # (content, reasoning, tool_calls)——旧代码只认 len==3，模型正常说 DONE 会走无日志的
+                # 静默 break，导致闲逛结束永远没有记录
+                if isinstance(response, tuple) and len(response) >= 2:
+                    content = str(response[0] or "")
+                    tool_calls = response[2] if len(response) >= 3 else None
                     if not tool_calls:
                         # 不调工具 = 结束（DONE 或自言自语）
-                        logger.info(f"[闲逛] 会话结束: {(content or '')[:60]}")
+                        logger.info(f"[闲逛] 会话结束: {content[:60]}")
                         break
-                    messages.append({"role": "assistant", "content": content or "", "tool_calls": tool_calls})
+                    messages.append({"role": "assistant", "content": content, "tool_calls": tool_calls})
                     for call in tool_calls:
                         result_text = await self._execute_idle_action(call, session_state)
                         messages.append(
@@ -563,6 +635,7 @@ class ProactiveManager:
                         )
                     continue
                 else:
+                    logger.warning(f"[闲逛] 响应格式异常: {type(response).__name__}，本会话提前收摊")
                     break
             logger.info("[闲逛] 上网会话关闭")
         except Exception as e:
@@ -627,6 +700,17 @@ class ProactiveManager:
         except Exception as e:
             logger.debug(f"枚举聊天对象失败: {e}")
         return {"groups": groups[:6], "friends": friends[:6]}
+
+    def _idle_chat_id_or_first(self) -> str:
+        """P4：闲逛世界卡注入用的最近活跃会话 id（闲逛是全局单例引擎，取最近一条消息的 chat_id）"""
+        try:
+            from ..common.database import db
+
+            doc = db.messages.find_one({}, {"chat_id": 1}, sort=[("time", -1)])
+            return str((doc or {}).get("chat_id", "") or "")
+        except Exception as e:
+            logger.debug(f"[闲逛] 取最近会话失败: {e}")
+            return ""
 
     def _get_friend_uins(self, limit: int = 5) -> List[str]:
         """从 MongoDB 私聊消息流提取最近聊过的好友 QQ（按最近活跃排序，重启不丢名单）"""

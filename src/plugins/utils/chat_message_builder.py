@@ -6,7 +6,7 @@ from src.config.config import global_config
 # 移除 logger 和 traceback，因为错误处理移至 repository
 # from src.common.logger import get_module_logger
 # import traceback
-from typing import List, Dict, Any, Tuple  # 确保类型提示被导入
+from typing import List, Dict, Any, Optional, Tuple  # 确保类型提示被导入
 import time  # 导入 time 模块以获取当前时间
 
 # 导入新的 repository 函数
@@ -18,6 +18,19 @@ from src.plugins.chat.utils import translate_timestamp_to_human_readable
 
 # 不再需要文件级别的 logger
 # logger = get_module_logger(__name__)
+
+
+# 精准引用编号注册表：chat_id -> {编号n: {"message_id","user_id","name","time"}}。
+# build_readable_messages(numbered=True) 构建展示文本的同时冻结"编号→真实消息"映射，
+# 统一大脑生成后经 take_quote_number_map 取走（取即删防串聊），发送链路据此把 [引用#n] 解析成原生引用框。
+_quote_number_registry: Dict[str, Dict[int, Dict[str, Any]]] = {}
+
+
+def take_quote_number_map(chat_id: str) -> Dict[int, Dict[str, Any]]:
+    """取走指定聊天的引用编号映射（取即删）。没有或已过期返回空 dict（调用方 fail-open 降级）。"""
+    if not chat_id:
+        return {}
+    return _quote_number_registry.pop(str(chat_id), None) or {}
 
 
 def get_raw_msg_by_timestamp(
@@ -147,6 +160,9 @@ async def _build_readable_messages_internal(
     merge_messages: bool = False,
     timestamp_mode: str = "relative",
     truncate: bool = False,
+    numbered: bool = False,
+    start_num: int = 1,
+    number_map_out: Optional[Dict[int, Dict[str, Any]]] = None,
 ) -> Tuple[str, List[Tuple[float, str, str]]]:
     """
     内部辅助函数，构建可读消息字符串和原始消息详情列表。
@@ -157,6 +173,9 @@ async def _build_readable_messages_internal(
         merge_messages: 是否合并来自同一用户的连续消息。
         timestamp_mode: 时间戳的显示模式 ('relative', 'absolute', etc.)。传递给 translate_timestamp_to_human_readable。
         truncate: 是否根据消息的新旧程度截断过长的消息内容。
+        numbered: 是否开启精准引用编号（每条消息内容前加 "#n " 前缀）。
+        start_num: 编号起始值（read_mark 分段构建时接续编号用）。
+        number_map_out: 传入 dict 时冻结 "编号n → 消息元数据" 映射（message_id/user_id/name/time）。
 
     Returns:
         包含格式化消息的字符串和原始消息详情列表 (时间戳, 发送者名称, 内容) 的元组。
@@ -165,6 +184,7 @@ async def _build_readable_messages_internal(
         return "", []
 
     message_details_raw: List[Tuple[float, str, str]] = []
+    raw_meta: List[Dict[str, Any]] = []  # 与 message_details_raw 一一对应，编号映射用
 
     # 1 & 2: 获取发送者信息并提取消息组件
     for msg in messages:
@@ -216,11 +236,35 @@ async def _build_readable_messages_internal(
             person_name = person_name
 
         message_details_raw.append((timestamp, person_name, content))
+        raw_meta.append(
+            {
+                "message_id": str(msg.get("message_id") or ""),
+                "user_id": str(user_id or ""),
+                "name": person_name,
+                "time": timestamp,
+            }
+        )
 
     if not message_details_raw:
         return "", []
 
-    message_details_raw.sort(key=lambda x: x[0])  # 按时间戳(第一个元素)升序排序，越早的消息排在前面
+    # 按时间戳(第一个元素)升序排序，越早的消息排在前面；meta 与之一一对应，必须同序
+    _order = sorted(range(len(message_details_raw)), key=lambda _i: message_details_raw[_i][0])
+    message_details_raw = [message_details_raw[_i] for _i in _order]
+    raw_meta = [raw_meta[_i] for _i in _order]
+
+    # 精准引用编号：排好序后给每条消息编 #n（展示内容加前缀 + 冻结编号→真实消息映射）
+    if numbered:
+        for _offset, _meta in enumerate(raw_meta):
+            # QQ戳一拍等系统事件的 message_id 是 "notice" 这类非数字值，QQ 无法引用——
+            # 这类行照常展示（她看得出谁拍了谁）但不编号、不进映射，从根上杜绝挂出无效引用框
+            if not str(_meta.get("message_id") or "").isdigit():
+                continue
+            _n = start_num + _offset
+            if number_map_out is not None:
+                number_map_out[_n] = _meta
+            _ts, _name, _content = message_details_raw[_offset]
+            message_details_raw[_offset] = (_ts, _name, f"#{_n} {_content}")
 
     # 应用截断逻辑 (如果 truncate 为 True)
     message_details: List[Tuple[float, str, str]] = []
@@ -342,18 +386,33 @@ async def build_readable_messages(
     timestamp_mode: str = "relative",
     read_mark: float = 0.0,
     truncate: bool = False,
+    numbered: bool = False,
+    chat_id: str = None,
+    number_map_out: Optional[Dict[int, Dict[str, Any]]] = None,
 ) -> str:
     """
     将消息列表转换为可读的文本格式。
     如果提供了 read_mark，则在相应位置插入已读标记。
     允许通过参数控制格式化行为。
+    numbered=True 时给每条消息加 "#n " 编号前缀：
+    - 传 chat_id：映射冻结进公共注册表（统一大脑链路，配 take_quote_number_map 取走）
+    - 传 number_map_out：映射直接填进调用方的 dict（审核器等独立窗口场景，不碰公共注册表）
+    两者可同时用；都不传则只做编号展示。
     """
     if read_mark <= 0:
         # 没有有效的 read_mark，直接格式化所有消息
+        num_map: Dict[int, Dict[str, Any]] = {}
         formatted_string, _ = await _build_readable_messages_internal(
-            messages, replace_bot_name, merge_messages, timestamp_mode, truncate
+            messages,
+            replace_bot_name,
+            merge_messages,
+            timestamp_mode,
+            truncate,
+            numbered=numbered,
+            start_num=1,
+            number_map_out=num_map if numbered else None,
         )
-        return formatted_string
+        merged_map = num_map
     else:
         # 按 read_mark 分割消息
         messages_before_mark = [msg for msg in messages if msg.get("time", 0) <= read_mark]
@@ -362,14 +421,26 @@ async def build_readable_messages(
         # 分别格式化
         # 注意：这里决定对已读和未读部分都应用相同的 truncate 设置
         # 如果需要不同的行为（例如只截断已读部分），需要调整这里的调用
+        num_before: Dict[int, Dict[str, Any]] = {}
         formatted_before, _ = await _build_readable_messages_internal(
-            messages_before_mark, replace_bot_name, merge_messages, timestamp_mode, truncate
+            messages_before_mark,
+            replace_bot_name,
+            merge_messages,
+            timestamp_mode,
+            truncate,
+            numbered=numbered,
+            start_num=1,
+            number_map_out=num_before if numbered else None,
         )
+        num_after: Dict[int, Dict[str, Any]] = {}
         formatted_after, _ = await _build_readable_messages_internal(
             messages_after_mark,
             replace_bot_name,
             merge_messages,
             timestamp_mode,
+            numbered=numbered,
+            start_num=len(num_before) + 1,  # 未读段接续编号，保证全窗口编号连续
+            number_map_out=num_after if numbered else None,
         )
 
         readable_read_mark = translate_timestamp_to_human_readable(read_mark, mode=timestamp_mode)
@@ -377,14 +448,23 @@ async def build_readable_messages(
 
         # 组合结果，确保空部分不引入多余的标记或换行
         if formatted_before and formatted_after:
-            return f"{formatted_before}{read_mark_line}{formatted_after}"
+            formatted_string = f"{formatted_before}{read_mark_line}{formatted_after}"
         elif formatted_before:
-            return f"{formatted_before}{read_mark_line}"
+            formatted_string = f"{formatted_before}{read_mark_line}"
         elif formatted_after:
-            return f"{read_mark_line}{formatted_after}"
+            formatted_string = f"{read_mark_line}{formatted_after}"
         else:
-            # 理论上不应该发生，但作为保险
+            # 理论上不应该发生，但作为保险；前后都无消息时不写任何映射
             return read_mark_line.strip()  # 如果前后都无消息，只返回标记行
+
+        merged_map = {**num_before, **num_after}
+
+    if numbered:
+        if number_map_out is not None:
+            number_map_out.update(merged_map)
+        if chat_id and merged_map:
+            _quote_number_registry[str(chat_id)] = merged_map
+    return formatted_string
 
 
 async def get_person_id_list(messages: List[Dict[str, Any]]) -> List[str]:

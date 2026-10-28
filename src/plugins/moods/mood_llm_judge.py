@@ -61,9 +61,12 @@ def _append_timeline(line: str) -> None:
         logger.error(f"写入心情时间线失败: {e}")
 
 
-async def judge_mood_after_reply(anchor_text: str, response_texts: List[str], chat_type: str = "group") -> None:
+async def judge_mood_after_reply(
+    anchor_text: str, response_texts: List[str], chat_type: str = "group", speaker_uid: str = ""
+) -> None:
     """回复完成后判断心情变化。非阻塞调用（create_task），异常不影响主流程。
-    采样已在 spawn_mood_judge 处做过，这里不再重复掷骰。"""
+    采样已在 spawn_mood_judge 处做过，这里不再重复掷骰。
+    speaker_uid：锚点消息说话人（P7 按人加权心情用，空则权重1.0）。"""
     try:
         from ..moods.moods import MoodManager
 
@@ -110,7 +113,8 @@ async def judge_mood_after_reply(anchor_text: str, response_texts: List[str], ch
             logger.debug("心情变化不显著，跳过应用")
             return
 
-        mood_manager.update_mood_from_text(mood_text, valence_change / JUDGE_BIAS_DIVISOR, arousal_change / JUDGE_BIAS_DIVISOR)
+        # P7 接线：按说话人好感加权应用心情波动（update_mood_by_user 内部 fail-open 权重1.0）
+        mood_manager.update_mood_by_user(speaker_uid, valence_change / JUDGE_BIAS_DIVISOR, arousal_change / JUDGE_BIAS_DIVISOR)
         if reason:
             mood_manager.last_reason = reason
             mood_manager.last_reason_time = time.time()
@@ -132,13 +136,16 @@ async def judge_mood_after_reply(anchor_text: str, response_texts: List[str], ch
         logger.error(f"心情判断异常: {e}")
 
 
-def spawn_mood_judge(anchor_text: str, response_texts: List[str], chat_type: str = "group") -> None:
+def spawn_mood_judge(
+    anchor_text: str, response_texts: List[str], chat_type: str = "group", speaker_uid: str = ""
+) -> None:
     """在回复流程结束后调用：按场景决定采样后异步执行，不阻塞发送流程。
-    群聊按采样率（省 token）；私聊情绪浓度高，全量判断不采样。"""
+    群聊按采样率（省 token）；私聊情绪浓度高，全量判断不采样。
+    speaker_uid：锚点消息说话人 user_id（P7 按人加权心情用）。"""
     if chat_type != "private" and random.random() > MOOD_JUDGE_SAMPLE_RATE:
         return
     try:
         asyncio.get_running_loop()
     except RuntimeError:
         return
-    asyncio.create_task(judge_mood_after_reply(anchor_text, response_texts, chat_type))
+    asyncio.create_task(judge_mood_after_reply(anchor_text, response_texts, chat_type, speaker_uid=speaker_uid))

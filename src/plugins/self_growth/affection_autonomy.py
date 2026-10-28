@@ -20,6 +20,12 @@ logger = get_logger("affection_autonomy")
 
 JOURNAL_FILE = os.path.join("data", "self_memory", "journal.jsonl")
 
+# 日限额（P3改动二·拟真分层版，老大拍板"要像个人"）：
+# 真人对同一个人不会一天被触动很多回（第一次是触动，第五次是麻木）——主闸门限"每人"；
+# 但对群里不同人的真实触动一天可能有好几次，总量不该掐死——全局上限只作模型学坏刷屏的保险丝
+AFF_PERSON_DAILY_MAX = 2  # 每人每日成功申报上限
+AFF_GLOBAL_DAILY_MAX = 8  # 全天所有人合计上限（保险丝，正常情绪节律碰不到）
+
 # 内存趋势索引（坑R）：{qq -> deque(maxlen=3)}，13.3 关系动向注入只读此索引（零磁盘 IO）
 _trend_index: Dict[str, deque] = {}
 _backfilled = False
@@ -127,6 +133,15 @@ async def apply_affection_update(person_name: str, delta: int, reason: str, chat
     7. 全程 try/except fail-open"""
     try:
         _ensure_backfill()
+        # 日限额（拟真分层）：全局保险丝在此拦（resolve 前省一次反查）；每人限额 resolve 后按 qq 查
+        _today = time.strftime("%Y-%m-%d")
+        if getattr(apply_affection_update, "_day", "") != _today:
+            apply_affection_update._day = _today
+            apply_affection_update._per_person = {}
+            apply_affection_update._total = 0
+        if getattr(apply_affection_update, "_total", 0) >= AFF_GLOBAL_DAILY_MAX:
+            logger.info(f"[好感自主] 今日申报总量已达上限({AFF_GLOBAL_DAILY_MAX})，静默忽略")
+            return False
         person_name = str(person_name or "").strip()
         reason = str(reason or "").strip()
         if not person_name:
@@ -146,6 +161,12 @@ async def apply_affection_update(person_name: str, delta: int, reason: str, chat
         qq = await _resolve_qq_by_name(person_name, chat_id)
         if not qq:
             logger.warning(f"[好感自主] 申报被拒：找不到人 {person_name}")
+            return False
+
+        # 每人限额（拟真主闸门）：对同一个人第二次申报，说明他今天真的很触动你——第三次就是刷了
+        _per = getattr(apply_affection_update, "_per_person", {})
+        if _per.get(qq, 0) >= AFF_PERSON_DAILY_MAX:
+            logger.info(f"[好感自主] 今日对 {person_name} 申报已达上限({AFF_PERSON_DAILY_MAX})，静默忽略")
             return False
 
         # 落库
@@ -193,6 +214,10 @@ async def apply_affection_update(person_name: str, delta: int, reason: str, chat
             logger.error(f"[好感自主] journal 写入失败: {e}")
 
         logger.info(f"[好感自主] {person_name}({qq}) 好感{delta:+d}：{reason[:40]}（现值 {new_value:.0f}）")
+        _per = getattr(apply_affection_update, "_per_person", {})
+        _per[qq] = _per.get(qq, 0) + 1
+        apply_affection_update._per_person = _per
+        apply_affection_update._total = getattr(apply_affection_update, "_total", 0) + 1
         return True
     except Exception as e:
         logger.error(f"[好感自主] 申报处理失败: {e}")

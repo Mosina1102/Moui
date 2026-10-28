@@ -40,6 +40,12 @@ def get_db():
     if _client is None:
         _client = __create_database_instance()
         _db = _client[os.getenv("DATABASE_NAME", "MegBot")]
+        # O1 复合索引：messages 按 chat_id+time 倒序的查询走 IXSCAN
+        # （一年半大表首次建索引稍慢属预期，MongoDB 4.x+ 支持后台式建索引；失败只记日志不阻断）
+        try:
+            _db.messages.create_index([("chat_id", 1), ("time", -1)])
+        except Exception as _e:
+            print(f"[database] messages 复合索引创建跳过: {_e}")
     return _db
 
 

@@ -23,6 +23,14 @@ from src.plugins.utils.timer_calculator import Timer
 
 logger = get_logger("chat")
 
+# P8 心情联动：低落时回复意愿打折，兴奋时略增（与 P1 同一套系数哲学，fail-open）
+WILLING_MOOD_K = 0.3  # valence 系数：valence=-1 → ×0.7，+1 → ×1.3
+WILLING_MOOD_MIN = 0.7  # 打折下限
+WILLING_MOOD_MAX = 1.3  # 加成上限
+
+# O4 relation 降采样：关系判定是两次 LLM 调用（情绪标签+关系增量），按此概率抽样判定（其余轮跳过）
+O4_RELATION_SAMPLE_RATE = 0.3
+
 
 class NormalChat:
     def __init__(self, chat_stream: ChatStream, interest_dict: dict):
@@ -219,6 +227,15 @@ class NormalChat:
             is_willing = True
             reply_probability = await willing_manager.get_reply_probability(message.message_info.message_id)
 
+            # P8 心情联动（考古注释转正）：低落回复意愿打折，兴奋略增；被@走上面分支不经过这里，不受心情影响
+            try:
+                _v = self.mood_manager.get_current_mood().valence
+                _mf = max(WILLING_MOOD_MIN, min(WILLING_MOOD_MAX, 1.0 + _v * WILLING_MOOD_K))
+                if abs(_mf - 1.0) > 0.01:
+                    reply_probability = min(1.0, reply_probability * _mf)
+            except Exception:
+                pass
+
             if message.message_info.additional_config:
                 if "maimcore_reply_probability_gain" in message.message_info.additional_config.keys():
                     reply_probability += message.message_info.additional_config["maimcore_reply_probability_gain"]
@@ -296,8 +313,11 @@ class NormalChat:
                 await self._handle_emoji(message, response_set[0])
 
             # 更新关系情绪 (不再需要传入 chat)
-            with Timer("关系更新", timing_results):
-                await self._update_relationship(message, response_set)
+            # O4 降采样：非每轮必算——按 O4_RELATION_SAMPLE_RATE 抽样判定，
+            # label/stance 喂 mood 的路径同步降频（本轮抽样跳过时心情也不吃这轮判定）
+            if random() < O4_RELATION_SAMPLE_RATE:
+                with Timer("关系更新", timing_results):
+                    await self._update_relationship(message, response_set)
 
             # 回复后处理
             await willing_manager.after_generate_reply_handle(message.message_info.message_id)

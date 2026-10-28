@@ -2,6 +2,8 @@
 1. 真@解析：把回复文本里的"@昵称"转成真正的 at 段（从 MongoDB 消息记录反查QQ号）
 2. 引用自己：文本开头的 [引用自己] 标记 → 自动引用Moui上一条消息（经适配器查询真实消息id）
 3. 引用对方：文本里的 [引用] 标记 → 引用本次回复的锚点消息（构造时传入的 reply 对象，自带QQ真实id）
+4. 兜底清洗：剥掉本链路不解析的引用标记（[引用图] 已废弃；[引用#n] 只在 HeartFC 链路解析），防标记泄漏到正文
+5. 精准引用 [引用#n] 的解析在 HeartFC 发送链路完成（heartFC_chat._send_response_messages），不经过这里
 """
 import asyncio
 import re
@@ -25,6 +27,9 @@ SELF_QUOTE_MARKER = "[引用自己]"
 
 # 引用对方标记（写在回复文本任意处，发送前被转换为引用锚点消息）
 RESPONSE_QUOTE_MARKER = "[引用]"
+
+# 本链路不解析的引用标记（[引用图] 已退役；[引用#n] 只在 HeartFC 链路解析）——兜底剥除防泄漏
+STALE_QUOTE_MARKER_RE = re.compile(r"\[引用(?:图|#\d+)\]")
 
 # @昵称 匹配：@ 后接 1~32 个非空白非@字符，后跟空白/标点/行尾
 AT_PATTERN = re.compile(r"@([^\s@，,。！!？?、~：:]{1,32})")
@@ -199,8 +204,8 @@ def _strip_response_quote(message: MessageSending) -> bool:
                 return True
             if message.reply:
                 real_id = str(message.reply.message_info.message_id or "")
-                # 占位符锚点（mid_pf_ 前缀）是自造id，QQ 引用它必失败，降级为普通消息
-                if real_id and not real_id.startswith("mid_pf_"):
+                # QQ真实消息id必为纯数字——"notice"(戳一拍)/mid_pf_(占位)等引用必失败，降级为普通消息
+                if real_id.isdigit():
                     reply_seg = type(seg)(type="reply", data=real_id)
                     message.message_segment = type(message.message_segment)(type="seglist", data=[reply_seg] + list(segments))
                     return True
@@ -209,6 +214,22 @@ def _strip_response_quote(message: MessageSending) -> bool:
             message.message_segment = type(message.message_segment)(type="seglist", data=segments)
             return False
     return False
+
+
+def _strip_stale_quote_markers(message: MessageSending) -> None:
+    """剥掉当前链路不解析的引用标记文本（不生成引用，纯清洗防标记泄漏到正文）。
+
+    HeartFC 链路在构造消息前已自行解析/剥除 [引用#n]，这里对它是 no-op；
+    normal_chat/PFC 等链路若模型漏出 [引用图]/[引用#n]，在这里静默降级为普通文本。
+    """
+    segments = message.message_segment.data if message.message_segment.type == "seglist" else [message.message_segment]
+    changed = False
+    for idx, seg in enumerate(segments):
+        if seg.type == "text" and STALE_QUOTE_MARKER_RE.search(seg.data):
+            segments[idx] = type(seg)(type="text", data=STALE_QUOTE_MARKER_RE.sub("", seg.data).strip())
+            changed = True
+    if changed:
+        message.message_segment = type(message.message_segment)(type="seglist", data=segments)
 
 
 def _strip_self_quote(message: MessageSending) -> Optional[str]:
@@ -228,13 +249,16 @@ def _strip_self_quote(message: MessageSending) -> Optional[str]:
 async def enhance_outgoing_message(message: MessageSending) -> None:
     """发送前增强入口：引用对方 + 引用自己 + 真@解析。任何异常都不阻断发送。"""
     try:
+        # 兜底清洗：剥掉本链路不解析的引用标记（[引用图] 已废弃；[引用#n] 只在 HeartFC 链路解析）
+        _strip_stale_quote_markers(message)
+
         _strip_response_quote(message)
 
         self_quote_local_id = _strip_self_quote(message)
         if self_quote_local_id:
             # 适配器查询是同步 HTTP，放线程里跑
             real_id = await asyncio.to_thread(_query_real_message_id, self_quote_local_id)
-            if real_id:
+            if real_id and real_id.isdigit():  # 适配器返回的QQ真实id必为数字，防呆
                 seg = message.message_segment.data if message.message_segment.type == "seglist" else [message.message_segment]
                 reply_seg = type(seg[0])(type="reply", data=str(real_id))
                 message.message_segment = type(message.message_segment)(type="seglist", data=[reply_seg] + list(seg))

@@ -91,11 +91,14 @@ def _format_cards_text(stream_id: str, top_users: list) -> str:
     return "\n".join(lines)
 
 
-async def archive_group(stream_id: str) -> None:
-    """对单群执行一次归纳。全程 try/except（fail-open）。"""
+async def archive_group(stream_id: str) -> bool:
+    """对单群执行一次归纳。返回 True=完成（含死群/素材不足等正常跳过），False=可重试失败（LLM 429/网络/解析）。
+
+    失败信号供调度器做 60s→300s 退避重试。
+    """
     try:
         if not stream_id:
-            return
+            return True
         from ..chat.chat_stream import chat_manager
         from src.plugins.utils.chat_message_builder import (
             build_readable_messages,
@@ -106,7 +109,7 @@ async def archive_group(stream_id: str) -> None:
 
         chat_stream = chat_manager.get_stream(stream_id)
         if chat_stream is None:
-            return
+            return True
 
         now = time.time()
         min_msgs = int(getattr(global_config, "min_msgs_to_archive", 20) or 20)
@@ -115,14 +118,14 @@ async def archive_group(stream_id: str) -> None:
         msgs = get_raw_msg_before_timestamp_with_chat(chat_id=stream_id, timestamp=now, limit=500)
         msgs = [m for m in msgs if float(m.get("time", 0) or 0) >= now - 86400]
         if len(msgs) < min_msgs:
-            return
+            return True
 
         # 1b. 可读对话
         chat_log = await build_readable_messages(
             msgs, replace_bot_name=True, merge_messages=True, timestamp_mode="normal", read_mark=0.0
         )
         if not chat_log or len(chat_log.strip()) < 100:
-            return
+            return True
         chat_log = chat_log[:_DIALOG_CAP]
 
         # 1c. 海马体原料（坑⑪实证：检索路径只读无副作用；fast_retrieval=True 省一次 llm_topic_judge）
@@ -187,7 +190,7 @@ async def archive_group(stream_id: str) -> None:
         )
         if not ok or not isinstance(data, dict):
             logger.warning(f"[K·归档] 归纳输出解析失败，原文前200字: {content[:200]}")
-            return
+            return False  # 多半是429/网络抖动，供调度器退避重试
 
         person_updates = data.get("person_updates")
         episodic = data.get("episodic")
@@ -211,8 +214,10 @@ async def archive_group(stream_id: str) -> None:
         except Exception:
             pass
         logger.info(f"[K·归档] {group_name or stream_id[:8]}: 人物卡更新{n}条, 情节卡{m}条")
+        return True
     except Exception as e:
         logger.error(f"[K·归档] 单群归纳异常（跳过）: {e}")
+        return False  # 多半是429/网络抖动，供调度器退避重试
 
 
 async def pre_forget_safety_archive() -> None:

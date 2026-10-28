@@ -11,6 +11,11 @@ from src.individuality.individuality import Individuality
 
 logger = get_logger("mood")
 
+# P7 按人加权参数：好感越高情绪分量越重（500+ 的熟人一句话顶陌生人三句）
+MOOD_WEIGHT_AFF_DIVISOR = 500.0  # 好感除数：aff=+500 → ×2.0，aff=-250 → ×0.5
+MOOD_WEIGHT_MIN = 0.5  # 权重下限（负面关系也不至于完全无视）
+MOOD_WEIGHT_MAX = 2.0  # 权重上限（防单句情绪核弹）
+
 
 @dataclass
 class MoodState:
@@ -208,6 +213,16 @@ class MoodManager:
 
         self._update_mood_text()
 
+    def apply_direct_delta(self, valence_change: float, arousal_change: float, reason: str) -> None:
+        """程序化心情微调（P2 外部事件专用：黏人刹车等）。走同一 clamp/文案刷新，写入口唯一。"""
+        self.current_mood.valence = max(-1.0, min(1.0, self.current_mood.valence + valence_change))
+        self.current_mood.arousal = max(-1.0, min(1.0, self.current_mood.arousal + arousal_change))
+        self.last_reason = reason
+        self.last_reason_time = time.time()
+        self.last_reason_injected = False
+        self._update_mood_text()
+        logger.info(f"[心情] 程序化微调 ({valence_change:+.2f}, {arousal_change:+.2f}) | {reason}")
+
     def set_mood_text(self, text: str) -> None:
         """直接设置心情文本"""
         self.current_mood.text = text
@@ -226,11 +241,36 @@ class MoodManager:
         if closest_mood:
             self.current_mood.text = closest_mood
 
-    def update_mood_by_user(self, user_id: str, valence_change: float, arousal_change: float) -> None:
-        """根据用户ID更新情绪状态"""
+    @staticmethod
+    def _user_mood_weight(user_id: str) -> float:
+        """P7 按人加权：好感真值在 person_info.relationship_value（人物卡结构无好感字段），
+        qq→person_id 反查照抄 add_relationship_delta 范本（最近消息定位 platform）。
+        fail-open：任何一步取不到回 1.0。"""
+        try:
+            if not user_id:
+                return 1.0
+            from src.plugins.utils.chat_message_builder import get_raw_msg_before_timestamp_with_users
 
-        # 这里可以根据用户ID添加特定的权重或规则
-        weight = 1.0  # 默认权重
+            msgs = get_raw_msg_before_timestamp_with_users(timestamp=time.time(), person_ids=[str(user_id)], limit=1)
+            platform = (msgs[0].get("user_info") or {}).get("platform") if msgs else None
+            if not platform:
+                return 1.0
+            from src.common.database import db
+            from ..person_info.person_info import person_info_manager
+
+            person_id = person_info_manager.get_person_id(platform, int(str(user_id)))
+            doc = db.person_info.find_one({"person_id": person_id}, {"relationship_value": 1})
+            aff = float((doc or {}).get("relationship_value", 0) or 0)
+            weight = max(MOOD_WEIGHT_MIN, min(MOOD_WEIGHT_MAX, 1.0 + aff / MOOD_WEIGHT_AFF_DIVISOR))
+            if abs(weight - 1.0) > 0.01:
+                logger.debug(f"[心情加权] uid={user_id} 好感={aff:.0f} → 权重={weight:.2f}")
+            return weight
+        except Exception:
+            return 1.0
+
+    def update_mood_by_user(self, user_id: str, valence_change: float, arousal_change: float) -> None:
+        """根据用户ID更新情绪状态（P7：钩子转正——按人物好感加权，接线自 mood_llm_judge）"""
+        weight = self._user_mood_weight(user_id)
 
         self.current_mood.valence += valence_change * weight
         self.current_mood.arousal += arousal_change * weight

@@ -56,6 +56,14 @@ class BackgroundTaskManager:
             logger.error(f"可塑性记忆调度器初始化失败: {e}")
             self.plastic_scheduler = None
 
+        # 每日自动备份（O6）：独立 daemon 线程，每日 02:30 + 首启立即验证；fail-open 不影响主链路
+        try:
+            from src.common.backup_worker import start_backup_worker
+
+            start_backup_worker()
+        except Exception as e:
+            logger.error(f"备份线程启动失败: {e}")
+
         # Task references
         self._state_update_task: Optional[asyncio.Task] = None
         self._cleanup_task: Optional[asyncio.Task] = None

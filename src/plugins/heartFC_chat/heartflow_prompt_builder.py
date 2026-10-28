@@ -656,6 +656,38 @@ class PromptBuilder:
             relation_prompt += await relationship_manager.build_relationship_info(person)
             # print(f"relation_prompt: {relation_prompt}")
 
+        # P5 normal_chat 轻量人物卡：在场前3人有卡才注入（空卡不占位），只带印象+相处方式；
+        # 限额取统一大脑 inject_chars_limit 的一半（fail-open，任何异常只记日志）
+        try:
+            from ..self_growth.person_cards import get_card
+
+            _card_lines = []
+            for _platform, _uid, _uname in who_chat_in_group[:3]:
+                _card = get_card(str(_uid))
+                if not _card:
+                    continue
+                _impression = str(_card.get("impression", "") or "").strip()
+                _interaction = str(_card.get("interaction", "") or "").strip()
+                _parts = [_p for _p in (_impression, f"相处：{_interaction}" if _interaction else "") if _p]
+                if not _parts:
+                    continue
+                _line = f"- {_uname}：{'；'.join(_parts)}"
+                _card_lines.append(_line if len(_line) <= 120 else _line[:120])
+            if _card_lines:
+                try:
+                    _half_limit = max(60, int(getattr(global_config, "inject_chars_limit", 600) or 600) // 2)
+                except Exception:
+                    _half_limit = 300
+                _cards_text = ""
+                for _line in _card_lines:
+                    if len(_cards_text) + len(_line) + 1 > _half_limit:
+                        break  # 整块超限从最后一人开始丢弃（对齐统一大脑规则）
+                    _cards_text += _line + "\n"
+                if _cards_text:
+                    relation_prompt += "\n【你对群成员的了解】\n" + _cards_text
+        except Exception as _card_err:
+            logger.debug(f"[normal_chat] 轻量人物卡注入跳过: {_card_err}")
+
         # print(f"relat11111111ion_prompt: {relation_prompt}")
 
         # 心情

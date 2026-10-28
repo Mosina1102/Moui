@@ -32,7 +32,6 @@ from src.common.logger import (
     MODEL_UTILS_STYLE_CONFIG,
     PROMPT_STYLE_CONFIG,
     CHANGE_MOOD_TOOL_STYLE_CONFIG,
-    CHANGE_RELATIONSHIP_TOOL_STYLE_CONFIG,
     GET_KNOWLEDGE_TOOL_STYLE_CONFIG,
     GET_TIME_DATE_TOOL_STYLE_CONFIG,
     LPMM_GET_KNOWLEDGE_TOOL_STYLE_CONFIG,
@@ -78,7 +77,6 @@ MODULE_LOGGER_CONFIGS = {
     "model_utils": MODEL_UTILS_STYLE_CONFIG,  # 模型工具
     "prompt": PROMPT_STYLE_CONFIG,  # 提示词
     "change_mood_tool": CHANGE_MOOD_TOOL_STYLE_CONFIG,  # 改变心情工具
-    "change_relationship": CHANGE_RELATIONSHIP_TOOL_STYLE_CONFIG,  # 改变关系工具
     "get_knowledge_tool": GET_KNOWLEDGE_TOOL_STYLE_CONFIG,  # 获取知识工具
     "get_time_date": GET_TIME_DATE_TOOL_STYLE_CONFIG,  # 获取时间日期工具
     "lpm_get_knowledge_tool": LPMM_GET_KNOWLEDGE_TOOL_STYLE_CONFIG,  # LPMM获取知识工具
@@ -139,6 +137,7 @@ for _mod_logger, _mod_channel in {
     "proactive": "主动搭话",
     "interest": "兴趣",
     "outbound_enhance": "发送增强",
+    "backup": "工程·备份",
 }.items():
     MODULE_LOGGER_CONFIGS[_mod_logger] = _modded_style(_mod_channel)
 

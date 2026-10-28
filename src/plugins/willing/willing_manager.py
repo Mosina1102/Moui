@@ -63,7 +63,7 @@ class WillingInfo:
     is_mentioned_bot: bool
     is_emoji: bool
     interested_rate: float
-    # current_mood: float  当前心情？
+    # 心情联动不在 WillingInfo 存值：P8 已在 normal_chat 概率出口统一乘心情系数（考古注释转正）
 
 
 class BaseWillingManager(ABC):

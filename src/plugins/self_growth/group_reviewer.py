@@ -64,8 +64,11 @@ def _find_line_with(dialog: str, probe: str) -> str:
     return ""
 
 
-async def review_group(stream_id: str, group_name: str) -> None:
-    """单群每日审查。异常全部吞掉（fail-open）。"""
+async def review_group(stream_id: str, group_name: str) -> bool:
+    """单群每日审查。返回 True=完成（含无变化/证据拒绝等正常跳过），False=可重试失败（LLM 429/网络/解析）。
+
+    失败信号供调度器做 60s→300s 退避重试（429 时下个窗口 tick 自动补跑）。
+    """
     try:
         from src.plugins.utils.chat_message_builder import (
             build_readable_messages,
@@ -77,12 +80,12 @@ async def review_group(stream_id: str, group_name: str) -> None:
         msgs = get_raw_msg_before_timestamp_with_chat(chat_id=stream_id, timestamp=now, limit=500)
         msgs = [m for m in msgs if float(m.get("time", 0) or 0) >= now - 86400]
         if not msgs:
-            return
+            return True
         dialog = await build_readable_messages(
             msgs, replace_bot_name=True, merge_messages=True, timestamp_mode="normal", read_mark=0.0
         )
         if not dialog or len(dialog.strip()) < _MIN_DIALOG_LEN:
-            return
+            return True
         dialog = dialog[:_DIALOG_CAP]
 
         existing = group_impression.get_impression(stream_id) or {}
@@ -122,23 +125,23 @@ async def review_group(stream_id: str, group_name: str) -> None:
         )
         if not ok:
             logger.warning(f"审查输出解析失败: {group_name or stream_id}")
-            return
+            return False  # 多半是429/网络抖动，供调度器退避重试
 
         evidence = str(data.get("evidence", "") or "").strip()
         if not evidence or evidence == "无变化":
-            return
+            return True
 
         # 证据真实性校验（坑⑩）：前 12 字必须为素材子串
         probe = evidence[:12]
         if probe not in dialog:
             logger.warning(f"evidence 编造嫌疑，整体拒绝: {evidence[:30]}")
-            return
+            return True
 
         # 反自证校验（新坑B）：evidence 命中行是她自己的发言 → 无效证据
         hit_line = _find_line_with(dialog, probe)
         if hit_line and _is_bot_line(hit_line, bot_name):
             logger.warning(f"evidence 摘自她自己的发言（自证），拒绝: {evidence[:30]}")
-            return
+            return True
 
         updates = {
             "group_type": data.get("group_type"),
@@ -148,5 +151,7 @@ async def review_group(stream_id: str, group_name: str) -> None:
             "quirks": data.get("quirks"),
         }
         group_impression.apply_review(stream_id, group_name, updates, evidence)
+        return True
     except Exception as e:
         logger.error(f"审查异常 {group_name or stream_id}: {e}")
+        return False  # 多半是429/网络抖动，供调度器退避重试

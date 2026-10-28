@@ -146,10 +146,13 @@ class ChattingObservation(Observation):
                 )
             self.mid_memory_info = mid_memory_str
 
+        # 精准引用：统一大脑看的这份记录开编号（行首 #n），同时冻结编号→真实消息映射供 [引用#n] 解析
         self.talking_message_str = await build_readable_messages(
             messages=self.talking_message,
             timestamp_mode="lite",
             read_mark=last_obs_time_mark,
+            numbered=True,
+            chat_id=self.chat_id,
         )
         self.talking_message_str_truncate = await build_readable_messages(
             messages=self.talking_message,

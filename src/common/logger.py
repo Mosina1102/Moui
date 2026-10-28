@@ -728,22 +728,6 @@ CHANGE_MOOD_TOOL_STYLE_CONFIG = {
     },
 }
 
-CHANGE_RELATIONSHIP_TOOL_STYLE_CONFIG = {
-    "advanced": {
-        "console_format": (
-            "<white>{time:YYYY-MM-DD HH:mm:ss}</white> | "
-            "<level>{level: <8}</level> | "
-            "<fg #3FC1C9>关系工具</fg #3FC1C9> | "
-            "<level>{message}</level>"
-        ),
-        "file_format": "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {extra[module]: <15} | 关系工具 | {message}",
-    },
-    "simple": {
-        "console_format": "<level>{time:MM-DD HH:mm}</level> | <light-green>关系工具</light-green> | {message}",
-        "file_format": "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {extra[module]: <15} | 关系工具 | {message}",
-    },
-}
-
 GET_KNOWLEDGE_TOOL_STYLE_CONFIG = {
     "advanced": {
         "console_format": (
@@ -852,11 +836,6 @@ MODEL_UTILS_STYLE_CONFIG = MODEL_UTILS_STYLE_CONFIG["simple"] if SIMPLE_OUTPUT e
 PROMPT_STYLE_CONFIG = PROMPT_STYLE_CONFIG["simple"] if SIMPLE_OUTPUT else PROMPT_STYLE_CONFIG["advanced"]
 CHANGE_MOOD_TOOL_STYLE_CONFIG = (
     CHANGE_MOOD_TOOL_STYLE_CONFIG["simple"] if SIMPLE_OUTPUT else CHANGE_MOOD_TOOL_STYLE_CONFIG["advanced"]
-)
-CHANGE_RELATIONSHIP_TOOL_STYLE_CONFIG = (
-    CHANGE_RELATIONSHIP_TOOL_STYLE_CONFIG["simple"]
-    if SIMPLE_OUTPUT
-    else CHANGE_RELATIONSHIP_TOOL_STYLE_CONFIG["advanced"]
 )
 GET_KNOWLEDGE_TOOL_STYLE_CONFIG = (
     GET_KNOWLEDGE_TOOL_STYLE_CONFIG["simple"] if SIMPLE_OUTPUT else GET_KNOWLEDGE_TOOL_STYLE_CONFIG["advanced"]

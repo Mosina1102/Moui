@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 import traceback
 import random  # <--- 添加导入
@@ -35,6 +36,11 @@ WAITING_TIME_THRESHOLD = 300  # 等待新消息时间阈值，单位秒
 EMOJI_SEND_PRO = 0.3  # 设置一个概率，比如 30% 才真的发
 CONSECUTIVE_NO_REPLY_THRESHOLD = 3  # 连续不回复的阈值
 MAX_NO_REPLY_TIME = 300  # 最大无回复等待时间(秒)
+
+# 精准引用：[引用#n] 指向聊天记录里行首编号 #n 的消息（统一大脑生成时冻结映射，发送时解析成原生引用框）
+QUOTE_N_RE = re.compile(r"\[引用#(\d+)\]")
+# [引用图] 已废弃（图片消息也有编号，统一走 [引用#n]），残留标记兜底剥除
+LEGACY_QUOTE_IMAGE_RE = re.compile(r"\[引用图\]")
 
 
 logger = get_logger("hfc")  # Logger Name Changed
@@ -544,6 +550,11 @@ class HeartFChatting:
                 # 发送前独立审核（独立模型把关时效/重复 + 顺手补引用补@；fail-open）
                 final_reply = result.get("reply", "")
                 final_at = result.get("at_qq", "")
+                # 精准引用编号映射（统一大脑生成时冻结），发送链路解析 [引用#n] 用
+                quote_number_map = result.get("quote_number_map") or {}
+                # 审核器精准补引用的目标（它看到的消息更新，由它指定引哪条；空=退回锚点）
+                forced_quote_id = ""
+                forced_quote_owner = ""
                 try:
                     from .group_reply_checker import check_group_reply
 
@@ -569,9 +580,19 @@ class HeartFChatting:
                         if checked and checked != final_reply:
                             logger.info(f"{self.log_prefix}发送审核修正: '{final_reply[:30]}' -> '{checked[:30]}'")
                             final_reply = checked
-                        if check_result.get("need_quote") and "[引用]" not in final_reply:
-                            final_reply = "[引用]" + final_reply
-                            logger.info(f"{self.log_prefix}发送审核补了引用, 原因'话题已隔一阵，引用锚定回应对象'")
+                        # 补引用：优先用审核器指定的精准目标（它跑在生成之后，看到的消息更新，知道该引哪条）；
+                        # 没给可用编号才退回锚点 [引用]。她已带 [引用#n]/[引用] 标记时不补（防双引用）
+                        if check_result.get("need_quote") and "[引用]" not in final_reply and not QUOTE_N_RE.search(final_reply):
+                            cand_id = str(check_result.get("quote_id") or "")
+                            if cand_id.isdigit():  # 非数字id（notice等）引用必失败，退回锚点
+                                forced_quote_id = cand_id
+                                forced_quote_owner = str(check_result.get("quote_owner") or "")
+                                logger.info(
+                                    f"{self.log_prefix}发送审核精准补引用: id={forced_quote_id} 主人={forced_quote_owner or '自己'}"
+                                )
+                            else:
+                                final_reply = "[引用]" + final_reply
+                                logger.info(f"{self.log_prefix}发送审核补了引用(锚点兜底), 原因'审核器未给出可用编号'")
                         final_at = str(check_result.get("at_qq") or final_at or "").strip()
                         check_reason = str(check_result.get("reason") or "").strip()
                         logger.info(f"{self.log_prefix}发送审核'通过', 原因'{check_reason[:50] if check_reason else '无改动'}'")
@@ -583,6 +604,9 @@ class HeartFChatting:
                     emoji_query=emoji_query,
                     cycle_timers=cycle_timers,
                     at_qq=final_at,
+                    quote_number_map=quote_number_map,
+                    forced_quote_id=forced_quote_id,
+                    forced_quote_owner=forced_quote_owner,
                 )
             elif action == "emoji_reply":
                 return await self._handle_emoji_reply(reasoning, emoji_query), ""
@@ -595,7 +619,14 @@ class HeartFChatting:
             return False, ""
 
     async def _send_unified_reply(
-        self, reply_text: str, emoji_query: str, cycle_timers: dict, at_qq: str = ""
+        self,
+        reply_text: str,
+        emoji_query: str,
+        cycle_timers: dict,
+        at_qq: str = "",
+        quote_number_map: dict = None,
+        forced_quote_id: str = "",
+        forced_quote_owner: str = "",
     ) -> tuple[bool, str]:
         """统一大脑的文本回复发送：跳过 _replier_work 生成，直接分段发送。"""
         self._lian_xu_bu_hui_fu_ci_shu = 0
@@ -623,6 +654,9 @@ class HeartFChatting:
                     response_set=response_set,
                     send_emoji=emoji_query,
                     at_qq=at_qq,
+                    quote_number_map=quote_number_map or {},
+                    forced_quote_id=forced_quote_id,
+                    forced_quote_owner=forced_quote_owner,
                 )
 
             # 方案K层4：她的回复真实发送成功 = 该次"中断语境"终结，交接 memo 立即作废（一次性语义）
@@ -643,6 +677,9 @@ class HeartFChatting:
                     getattr(anchor_message, "processed_plain_text", "") or "",
                     [str(reply_text)],
                     chat_type="group",
+                    speaker_uid=str(
+                        getattr(getattr(getattr(anchor_message, "message_info", None), "user_info", None), "user_id", "") or ""
+                    ),
                 )
             except Exception:
                 pass
@@ -1334,6 +1371,9 @@ class HeartFChatting:
         response_set: List[str],
         send_emoji: str,  # Emoji query decided by planner or tools
         at_qq: str = "",
+        quote_number_map: dict = None,
+        forced_quote_id: str = "",
+        forced_quote_owner: str = "",
     ):
         """
         发送器 (Sender): 使用 HeartFCSender 实例发送生成的回复。
@@ -1347,7 +1387,13 @@ class HeartFChatting:
             # 它需要负责创建 MessageThinking 和 MessageSending 对象
             # 并调用 self.sender.register_thinking 和 self.sender.type_and_send_message
             first_bot_msg = await self._send_response_messages(
-                anchor_message=anchor_message, response_set=response_set, thinking_id=thinking_id, at_qq=at_qq
+                anchor_message=anchor_message,
+                response_set=response_set,
+                thinking_id=thinking_id,
+                at_qq=at_qq,
+                quote_number_map=quote_number_map or {},
+                forced_quote_id=forced_quote_id,
+                forced_quote_owner=forced_quote_owner,
             )
 
             if first_bot_msg:
@@ -1679,7 +1725,14 @@ class HeartFChatting:
         return thinking_id
 
     async def _send_response_messages(
-        self, anchor_message: Optional[MessageRecv], response_set: List[str], thinking_id: str, at_qq: str = ""
+        self,
+        anchor_message: Optional[MessageRecv],
+        response_set: List[str],
+        thinking_id: str,
+        at_qq: str = "",
+        quote_number_map: dict = None,
+        forced_quote_id: str = "",
+        forced_quote_owner: str = "",
     ) -> Optional[MessageSending]:
         """发送回复消息 (尝试锚定到 anchor_message)，使用 HeartFCSender"""
         if not anchor_message or not anchor_message.chat_stream:
@@ -1705,6 +1758,8 @@ class HeartFChatting:
         mark_head = False
         first_bot_msg: Optional[MessageSending] = None
         reply_message_ids = []  # 记录实际发送的消息ID
+        bot_qq = str(global_config.BOT_QQ)
+        is_group = bool(getattr(chat, "group_info", None))
         bot_user_info = UserInfo(
             user_id=global_config.BOT_QQ,
             user_nickname=global_config.BOT_NICKNAME,
@@ -1714,9 +1769,55 @@ class HeartFChatting:
         for i, msg_text in enumerate(response_set):
             # 为每个消息片段生成唯一ID
             part_message_id = f"{thinking_id}_{i}"
-            if i == 0 and at_qq:
-                # 真@：首段构造 [at段, 文本段]（at_qq 来自群成员速查表，显式 QQ 号，无歧义）
-                logger.info(f"{self.log_prefix}附加真@段: QQ {at_qq}")
+
+            # ---------- 精准引用解析：[引用#n] → 冻结映射 → QQ 真实消息id ----------
+            # 解析失败/映射缺失/占位id 一律剥标记降级普通消息（fail-open，不堵发送）
+            quote_real_id = ""
+            quote_owner = ""
+            match_n = QUOTE_N_RE.search(msg_text)
+            if match_n:
+                msg_text = QUOTE_N_RE.sub("", msg_text).strip()
+                entry = (quote_number_map or {}).get(int(match_n.group(1))) or {}
+                cand_id = str(entry.get("message_id") or "")
+                cand_owner = str(entry.get("user_id") or "")
+                # QQ真实消息id必为纯数字；"notice"(戳一拍)/mid_pf_(占位)等非数字id引用必失败
+                if cand_id.isdigit():
+                    quote_real_id = cand_id
+                    if cand_owner and cand_owner != bot_qq:
+                        quote_owner = cand_owner
+                    logger.info(
+                        f"{self.log_prefix}[引用#{match_n.group(1)}] 解析成功: id={quote_real_id} 主人={quote_owner or '自己'}"
+                    )
+                else:
+                    logger.info(f"{self.log_prefix}[引用#{match_n.group(1)}] 锚点不可用（id={cand_id or '空'}），降级普通消息")
+            elif i == 0 and forced_quote_id:
+                # 审核器精准补引用（挂首段）：它跑在生成之后、看到的记录更新，由它指定该引哪条。
+                # 主人的@交给下方 at_targets 流程（群聊自动@，私聊不@）
+                quote_real_id = forced_quote_id
+                quote_owner = forced_quote_owner
+                logger.info(f"{self.log_prefix}审核器指定引用已挂首段: id={quote_real_id} 主人={quote_owner or '自己'}")
+
+            # [引用图] 已废弃：兜底剥掉防泄漏（图片消息也有编号，模型改用 [引用#n]）
+            if LEGACY_QUOTE_IMAGE_RE.search(msg_text):
+                msg_text = LEGACY_QUOTE_IMAGE_RE.sub("", msg_text).strip()
+
+            # 剥完标记后整段为空：跳过该段，防发出空文本/纯标记消息
+            if not msg_text:
+                logger.info(f"{self.log_prefix}片段 {i} 剥除引用标记后为空，跳过")
+                continue
+
+            # ---------- 组段：引用段 + @段（被引用者优先，老大规则"引用谁@谁"代码强制）+ 文本段 ----------
+            # 被引用者@挂在带引用标记的这段；原对话对象@（at_qq）仍只挂首段，两者都保（去重）
+            at_targets = []
+            if quote_owner and is_group:
+                at_targets.append(quote_owner)
+            if i == 0 and at_qq and str(at_qq) not in at_targets:
+                at_targets.append(str(at_qq))
+
+            segs = []
+            if quote_real_id:
+                segs.append(Seg(type="reply", data=quote_real_id))
+            if at_targets:
                 # @与正文之间补一个空格（QQ 渲染 at 段后直接拼文本，不加会变成"@哈基汐你好"）
                 at_text = msg_text
                 if at_text.startswith("@"):
@@ -1726,10 +1827,15 @@ class HeartFChatting:
                         at_text = rest
                 elif at_text and not at_text.startswith((" ", "　")):
                     at_text = " " + at_text
-                message_segment = Seg(
-                    type="seglist",
-                    data=[Seg(type="at", data=str(at_qq)), Seg(type="text", data=at_text)],
-                )
+                for _target in at_targets:
+                    segs.append(Seg(type="at", data=_target))
+                segs.append(Seg(type="text", data=at_text))
+                logger.info(f"{self.log_prefix}附加真@段: QQ {','.join(at_targets)}")
+            elif segs:
+                segs.append(Seg(type="text", data=msg_text))
+
+            if segs:
+                message_segment = Seg(type="seglist", data=segs)
             else:
                 message_segment = Seg(type="text", data=msg_text)
             bot_message = MessageSending(
@@ -1777,7 +1883,14 @@ class HeartFChatting:
             from ..moods.mood_llm_judge import spawn_mood_judge
 
             chat_type = "private" if not getattr(anchor_message.chat_stream, "group_info", None) else "group"
-            spawn_mood_judge(anchor_message.processed_plain_text or "", list(response_set), chat_type=chat_type)
+            spawn_mood_judge(
+                anchor_message.processed_plain_text or "",
+                list(response_set),
+                chat_type=chat_type,
+                speaker_uid=str(
+                    getattr(getattr(getattr(anchor_message, "message_info", None), "user_info", None), "user_id", "") or ""
+                ),
+            )
         except Exception as e:
             logger.error(f"{self.log_prefix} 触发心情判断失败: {e}")
 
