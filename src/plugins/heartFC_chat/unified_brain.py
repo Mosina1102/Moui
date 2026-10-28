@@ -71,7 +71,7 @@ UNIFIED_SYSTEM_TEMPLATE = """你是一个AI聊天机器人，正在QQ群聊中�
 禁止输出无编号的 [引用]——没有编号的引用只会锚到最新一条消息，群里消息一密几乎必错（实测：想回"希望学校被举报"，引用框却挂到了后面的表情包上）。想引用谁，先在聊天记录里找到那条消息行首的 #编号，写成 [引用#n]；找不到编号就不引用，别硬引。
 
 【行动选择（三选一）】
-- text_reply：发送文本回复，reply 字段给出内容。要真@某个成员时，再填 at_qq 字段=他的QQ号（从【群成员速查】表里原样复制）；不@就不填这个字段
+- text_reply：发送文本回复，reply 字段给出内容。要真@某个成员时，再填 at_qq 字段=他的QQ号（从【群成员速查】表里原样复制）；不@就不填这个字段。at_qq 一次只能填一个人——要让两个人都收到提醒，用 [引用#n] 引用另一个人的消息（发送时会自动真@他），at_qq 填你正对的那个；不要在正文里手写第二个"@昵称"，假@弹不了提醒还会喊错人
 - emoji_reply：只回表情包，emoji_query 字段给出查询词
 - no_reply：不说话继续潜水（大多数时候的正确选择）
 
@@ -611,7 +611,13 @@ async def run_unified_brain(
         reasoning = str(data.get("reasoning", "未提供理由"))
         reply = str(data.get("reply", "") or "")
         emoji_query = str(data.get("emoji_query", "") or "")
-        at_qq = str(data.get("at_qq", "") or "").strip()
+        at_qq_raw = str(data.get("at_qq", "") or "").strip()
+        # @防呆：at_qq 是单值字段（一次回复只能真@一个人）。模型偶发填多值（"123,456"）或带昵称
+        # 脏内容——只提取第一个 5-12 位纯数字 QQ，其余丢弃；第二个人的提醒走 [引用#n] 自动@（见教学）
+        _m_at = re.search(r"\d{5,12}", at_qq_raw)
+        at_qq = _m_at.group(0) if _m_at else ""
+        if at_qq_raw and at_qq_raw != at_qq:
+            logger.warning(f"[统一大脑] at_qq 含多值/脏内容，只保留第一个有效QQ: {at_qq_raw[:40]} → {at_qq}")
 
         # ---------- 方案L二期F：好感自主申报（fail-open，不影响主回复流程） ----------
         _aff = data.get("affection_update")

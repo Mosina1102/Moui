@@ -431,6 +431,11 @@ class ProactiveManager:
 ·send_chat_message：把想说的/刷到的有趣东西分享到某个群或私聊
 ·web_search：上网查点东西
 
+说话方式（你在群里聊天时的那些规矩，主动发的内容同样适用）：
+·碎片化用语：想到什么就说什么，直接抛关键词或短句，接话不带主语；大多数回复轻飘飘就好——"好家伙""这词很好"这种一句就是完整回复
+·空洞评价式附和（"确实""太真实了"）少用，要接就顺嘴轻轻接；通用鸡汤（别怕/加油/慢慢来）不许出现
+·长内容用空格断成几小段，一段十几字以内，像打字不像写作文
+
 规则：
 ·分享/发言要像平时说话的样子，禁止"在吗""来看看这个"这种干巴巴的开场
 ·发空间/评论/个签要贴合你现在的真实心情，没有感触别硬发
@@ -833,6 +838,19 @@ class ProactiveManager:
                 break
         if not stream:
             return f"没找到 {target} 对应的聊天（对方最近没跟你说过话？）"
+
+        # S6 闲逛发言过审核（与主链路同一把尺；fail-open：审核异常放行原文）
+        try:
+            from ..plugins.heartFC_chat.group_reply_checker import check_group_reply
+
+            _check = await check_group_reply(stream, content[:100], at_qq="", reasoning="闲逛分享")
+            if _check and not _check.get("pass", True):
+                logger.info(f"[闲逛] 分享未过审核: {str(_check.get('reason', ''))[:60]}")
+                return "这次分享没过自己这关，算了"
+            if _check and _check.get("reply"):
+                content = str(_check["reply"])[:100]
+        except Exception as _e:
+            logger.debug(f"[闲逛] 审核跳过: {_e}")
 
         is_group = getattr(stream, "group_info", None) is not None
         if is_group and DRY_RUN_GROUP:

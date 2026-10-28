@@ -1811,8 +1811,10 @@ class HeartFChatting:
             at_targets = []
             if quote_owner and is_group:
                 at_targets.append(quote_owner)
-            if i == 0 and at_qq and str(at_qq) not in at_targets:
+            if i == 0 and at_qq and str(at_qq).isdigit() and str(at_qq) not in at_targets:
                 at_targets.append(str(at_qq))
+            elif i == 0 and at_qq and not str(at_qq).isdigit():
+                logger.warning(f"{self.log_prefix}at_qq 非纯数字，丢弃防@错人: {str(at_qq)[:30]}")
 
             segs = []
             if quote_real_id:

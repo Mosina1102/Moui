@@ -7,6 +7,7 @@
 
 fail-open：审核异常/解析失败 → 放行原文（不因审核器故障堵死发送链路）。
 """
+import re
 from typing import Any, Dict, Optional
 
 from src.common.logger_manager import get_logger
@@ -15,6 +16,12 @@ from src.plugins.models.utils_model import LLMRequest
 from src.plugins.PFC.pfc_utils import get_items_from_json
 
 logger = get_logger("group_reply_checker")
+
+
+def _extract_first_qq(val) -> str:
+    """@防呆：at_qq 只可能是单值 QQ——审核模型偶发填多值/昵称脏内容，只取第一个 5-12 位数字。"""
+    m = re.search(r"\d{5,12}", str(val or ""))
+    return m.group(0) if m else ""
 
 # 审核系统提示词（固定前缀吃 KV 缓存）
 CHECK_SYSTEM = """你是群聊发送前的最后一道审核，替bot把关。给你群聊最近记录和一个待发送的回复，做两件事：
@@ -201,7 +208,7 @@ async def check_group_reply(chat_stream, reply: str, at_qq: str = "", reasoning:
             "reason": raw_reason if raw_reason else "（审核器未给理由）",
             "score": score_val,
             "reply": str(data.get("reply", "") or "").strip(),
-            "at_qq": str(data.get("at_qq", "") or "").strip(),
+            "at_qq": _extract_first_qq(data.get("at_qq")),
             "need_quote": bool(data.get("need_quote", False)),
             "quote_id": quote_id,
             "quote_owner": quote_owner,
