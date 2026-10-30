@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>墨忆MOUI 面板 · 原型演示</title>
+<style>
+:root{
+  --bg:#0d0f14;--card:#161923;--card2:#1c2030;--line:#262b3d;
+  --txt:#e8eaf2;--sub:#8b93ad;--pink:#f472b6;--purple:#a78bfa;--cyan:#22d3ee;
+  --green:#34d399;--yellow:#fbbf24;--red:#f87171;
+  --grad:linear-gradient(135deg,#f472b6,#a78bfa);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--txt);font:14px/1.6 system-ui,"Microsoft YaHei","PingFang SC",sans-serif;overflow:hidden}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#2c3247;border-radius:4px}
+button{font-family:inherit;cursor:pointer;border:none;border-radius:10px}
+input,select,textarea{font-family:inherit;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:9px 12px;font-size:14px;outline:none;width:100%}
+input:focus,textarea:focus,select:focus{border-color:var(--purple)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.btn{background:var(--card2);color:var(--txt);padding:9px 18px;transition:.15s}
+.btn:hover{filter:brightness(1.2)}
+.btn.primary{background:var(--grad);color:#fff;font-weight:600;box-shadow:0 4px 18px rgba(167,139,250,.35)}
+.btn.danger{background:transparent;border:1px solid var(--red);color:var(--red)}
+.tag{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;background:var(--card2);color:var(--sub);border:1px solid var(--line)}
+.tag.on{color:#fff;background:var(--grad);border:none}
+h3{font-size:15px;margin-bottom:12px}
+.sub{color:var(--sub);font-size:12.5px}
+
+/* ===== 布局 ===== */
+#app{display:flex;height:100vh}
+#side{width:200px;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 10px;flex-shrink:0}
+#logo{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+#logo .name{font-weight:800;font-size:18px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.nav{flex:1}
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--sub);text-decoration:none;margin-bottom:2px;transition:.15s;font-size:13.5px}
+.nav a:hover{background:var(--card2);color:var(--txt)}
+.nav a.act{background:linear-gradient(135deg,rgba(244,114,182,.15),rgba(167,139,250,.15));color:#fff}
+.nav a.act svg{color:var(--pink)}
+.nav svg{width:18px;height:18px;flex-shrink:0}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#top{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;gap:14px;background:var(--card)}
+#top .pg{font-weight:700;font-size:16px}
+#top .sp{flex:1}
+#pages{flex:1;overflow-y:auto;padding:22px}
+.page{display:none;max-width:1080px;margin:0 auto}
+.page.act{display:block;animation:fade .25s}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+
+/* ===== 状态灯 ===== */
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.g{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.y{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.dot.r{background:var(--red);box-shadow:0 0 8px var(--red)}
+
+/* ===== 开关 ===== */
+.sw{position:relative;width:42px;height:23px;flex-shrink:0;cursor:pointer}
+.sw input{display:none}
+.sw i{position:absolute;inset:0;background:#2c3247;border-radius:99px;transition:.2s}
+.sw i:after{content:"";position:absolute;left:3px;top:3px;width:17px;height:17px;border-radius:50%;background:#7b8299;transition:.2s}
+.sw input:checked+i{background:var(--grad)}
+.sw input:checked+i:after{left:22px;background:#fff}
+
+/* ===== Toast ===== */
+#toasts{position:fixed;top:70px;right:24px;z-index:999}
+.toast{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--purple);border-radius:12px;padding:12px 16px;margin-bottom:10px;box-shadow:0 8px 30px rgba(0,0,0,.4);animation:tin .3s;font-size:13px;max-width:320px}
+@keyframes tin{from{opacity:0;transform:translateX(30px)}to{opacity:1}}
+
+/* ===== 首启引导 ===== */
+#wizard{position:fixed;inset:0;background:radial-gradient(1200px 700px at 70% -10%,rgba(167,139,250,.18),transparent),radial-gradient(900px 600px at 10% 110%,rgba(244,114,182,.15),transparent),var(--bg);z-index:100;display:flex;align-items:center;justify-content:center}
+#wiz-card{width:620px;max-width:92vw;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:36px 40px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.steps{display:flex;gap:8px;margin-bottom:28px}
+.steps i{flex:1;height:4px;border-radius:4px;background:var(--line)}
+.steps i.on{background:var(--grad)}
+.wiz-foot{display:flex;gap:10px;margin-top:26px}
+.wiz-foot .sp{flex:1}
+.wstep{display:none}.wstep.act{display:block;animation:fade .25s}
+.opt-card{border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:.15s;background:var(--card2)}
+.opt-card:hover{border-color:var(--purple)}
+.opt-card.sel{border-color:var(--pink);box-shadow:0 0 0 1px var(--pink);background:linear-gradient(135deg,rgba(244,114,182,.08),rgba(167,139,250,.08))}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.big-check{width:88px;height:88px;border-radius:50%;background:var(--grad);margin:8px auto 20px;display:flex;align-items:center;justify-content:center;animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ===== 头像 ===== */
+.ava{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;flex-shrink:0}
+.a-pink{background:linear-gradient(135deg,#f472b6,#fb7185)}
+.a-purple{background:linear-gradient(135deg,#a78bfa,#818cf8)}
+.a-cyan{background:linear-gradient(135deg,#22d3ee,#34d399)}
+.a-yellow{background:linear-gradient(135deg,#fbbf24,#fb923c)}
+.a-gray{background:linear-gradient(135deg,#4b5563,#6b7280)}
+
+/* ===== 总览 ===== */
+.hero{display:flex;align-items:center;gap:18px;padding:22px;background:linear-gradient(135deg,rgba(244,114,182,.12),rgba(167,139,250,.12)),var(--card);border:1px solid var(--line);border-radius:18px;margin-bottom:18px}
+.stat4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.stat .num{font-size:24px;font-weight:800;margin:4px 0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.procs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.proc{background:var(--card2);border-radius:12px;padding:12px;text-align:center;border:1px solid var(--line)}
+.proc b{display:block;font-size:13px;margin:6px 0 2px}
+.moodbox{position:relative;height:190px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.mood-axis{position:absolute;background:var(--line)}
+.mood-dot{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--grad);box-shadow:0 0 12px var(--pink);transform:translate(-50%,50%);transition:1s}
+
+/* ===== 聊天 ===== */
+.chatwrap{display:grid;grid-template-columns:270px 1fr;gap:14px;height:calc(100vh - 140px)}
+.convlist{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow-y:auto}
+.conv{display:flex;gap:10px;padding:13px 14px;cursor:pointer;border-bottom:1px solid var(--line);align-items:center}
+.conv:hover{background:var(--card2)}
+.conv.sel{background:linear-gradient(135deg,rgba(244,114,182,.1),rgba(167,139,250,.1))}
+.conv .t{flex:1;min-width:0}
+.conv .t b{font-size:13.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{background:var(--pink);color:#fff;font-size:11px;border-radius:99px;padding:0 6px;min-width:18px;text-align:center}
+.chatbox{background:var(--card);border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
+.chathead{padding:13px 18px;border-bottom:1px solid var(--line);font-weight:600}
+.msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.msg{display:flex;gap:10px;max-width:75%}
+.msg .bub{background:var(--card2);border:1px solid var(--line);padding:9px 13px;border-radius:4px 14px 14px 14px}
+.msg .who{font-size:11.5px;color:var(--sub);margin-bottom:3px}
+.msg.me{align-self:flex-end;flex-direction:row-reverse}
+.msg.me .bub{background:linear-gradient(135deg,rgba(244,114,182,.2),rgba(167,139,250,.2));border-color:rgba(167,139,250,.3);border-radius:14px 4px 14px 14px}
+.bub.emoji-only{font-style:italic;color:var(--sub);background:repeating-linear-gradient(45deg,var(--card2),var(--card2) 8px,#20242f 8px,#20242f 16px)}
+.bub .quote{border-left:3px solid var(--purple);padding:4px 10px;background:var(--bg);border-radius:6px;font-size:12.5px;color:var(--sub);margin-bottom:6px}
+.sysline{text-align:center;color:var(--sub);font-size:12px}
+.daysep{text-align:center;color:var(--sub);font-size:11.5px;margin:4px 0}
+
+/* ===== 关系 ===== */
+.rels{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.rel{display:flex;gap:14px}
+.bar{height:7px;background:var(--bg);border-radius:4px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;background:var(--grad);border-radius:4px}
+.aff-num{font-size:20px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ===== 记忆 ===== */
+.mem{border-left:3px solid var(--purple);padding:12px 16px;background:var(--card2);border-radius:8px;margin-bottom:10px}
+.mem.evt{border-left-color:var(--cyan)}
+.mem.exp{border-left-color:var(--yellow)}
+.mem .meta{display:flex;gap:10px;align-items:center;margin-bottom:4px}
+
+/* ===== 大脑 ===== */
+.brainwrap{display:grid;grid-template-columns:1fr 300px;gap:14px}
+.brainsvg{background:var(--bg);border:1px solid var(--line);border-radius:14px;width:100%}
+.node{fill:var(--card2);stroke:var(--line);stroke-width:1.5;transition:.3s}
+.node.lit{stroke:var(--pink);fill:#2a1e2c;filter:drop-shadow(0 0 6px rgba(244,114,182,.6))}
+.nlabel{fill:var(--sub);font-size:11.5px;text-anchor:middle;transition:.3s}
+.nlabel.lit{fill:#fff}
+.edge{stroke:var(--line);stroke-width:1.5;fill:none}
+.edge.lit{stroke:var(--pink);stroke-width:2;filter:drop-shadow(0 0 4px rgba(244,114,182,.7))}
+.evtitem{padding:9px 12px;border-bottom:1px solid var(--line);font-size:12.5px;animation:fade .3s}
+.evtitem .n{color:var(--purple);font-weight:600}
+.evtitem .ts{color:var(--sub);font-size:11px;margin-right:8px}
+#evtlist{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow-y:auto;height:420px}
+
+/* ===== 日志 ===== */
+.term{background:#08090d;border:1px solid var(--line);border-radius:14px;padding:14px 16px;height:calc(100vh - 190px);overflow-y:auto;font:12.5px/1.75 Consolas,monospace}
+.lg{white-space:pre-wrap;word-break:break-all}
+.lg .ts{color:#5b6478}.lg .i{color:#7dd3fc}.lg .w{color:var(--yellow)}.lg .e{color:var(--red)}.lg .m{color:#c3cadd}
+
+/* ===== 更新 ===== */
+.update-hero{text-align:center;padding:34px}
+
+/* ===== 心流监控（K面板移植） ===== */
+@keyframes breath{0%,100%{box-shadow:0 0 0 rgba(244,114,182,0)}50%{box-shadow:0 0 24px rgba(244,114,182,.4)}}
+@keyframes fdot{0%,100%{opacity:.3}50%{opacity:1}}
+.flowgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.flowcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;cursor:pointer;position:relative;animation:breath var(--bd,3s) ease-in-out infinite;transition:border-color .2s}
+.flowcard:hover{border-color:var(--purple)}
+.flowcard.sel{border-color:var(--pink);background:linear-gradient(135deg,rgba(244,114,182,.08),rgba(167,139,250,.08))}
+.flowcard.low{animation-duration:7s !important}
+.flowcard.low .fk{color:var(--sub) !important}
+.fdot{width:10px;height:10px;border-radius:50%;background:var(--grad);display:inline-block;animation:fdot var(--bd,3s) ease-in-out infinite}
+.fdot.low{background:#3d4358;animation:none}
+.fk{font-size:26px;font-weight:800;color:var(--pink);line-height:1.1}
+.flowmind{font-size:12.5px;color:var(--sub);min-height:36px}
+.gline{stroke:var(--line);stroke-width:1}
+@media (max-width:1100px){.flowgrid{grid-template-columns:1fr 1fr}}
+
+/* ===== K面板移植：表格/tile/tier/pre ===== */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th,.tbl td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{color:var(--sub);font-weight:500}
+.bdg{display:inline-block;padding:0 9px;border-radius:99px;font-size:11.5px;border:1px solid var(--line)}
+.bdg.g{color:var(--green);border-color:var(--green)}
+.bdg.y{color:var(--yellow);border-color:var(--yellow)}
+.bdg.r{color:var(--red);border-color:var(--red)}
+.ktile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px 18px}
+.ktile .k{font-size:12px;color:var(--sub)}
+.ktile .v{font-size:21px;font-weight:800;margin:3px 0}
+.ktile .s{font-size:11.5px;color:var(--sub)}
+.kpre{background:#08090d;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font:12px/1.7 Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:340px;overflow-y:auto}
+.hbar{display:flex;gap:10px;align-items:center;margin:6px 0}
+.hbar .lb{width:150px;font-size:12px;color:var(--sub);flex-shrink:0;text-align:right}
+.hbar .tr{flex:1;background:var(--card2);border-radius:6px;overflow:hidden}
+.hbar .fi{height:100%;border-radius:6px;padding:1px 8px;font-size:11.5px;color:#111;min-width:24px}
+.navgrp{padding:10px 12px 4px;font-size:11px;color:var(--sub);letter-spacing:2px}
+.cfgline{display:flex;gap:10px;align-items:center;margin:8px 0}
+.cfgline .fk{width:120px;font-size:12.5px;color:var(--sub);flex-shrink:0}
+.cfgline input,.cfgline select{flex:1}
+.cfgdesc{font-size:11.5px;color:var(--sub);margin:-4px 0 8px 130px}
+/* 配置手风琴 */
+details.cfgsec{margin-bottom:10px}
+details.cfgsec summary{list-style:none;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 18px;font-weight:600;display:flex;align-items:center;gap:10px;font-size:14px}
+details.cfgsec summary::-webkit-details-marker{display:none}
+details.cfgsec summary:hover{border-color:var(--purple)}
+details.cfgsec[open] summary{border-radius:14px 14px 0 0;border-color:var(--purple)}
+details.cfgsec summary .chev{margin-left:auto;transition:.2s;color:var(--sub)}
+details.cfgsec[open] summary .chev{transform:rotate(90deg)}
+details.cfgsec .card{border-radius:0 0 14px 14px;border-top:none;margin:0}
+@media (max-width:900px){.cfgdesc{margin-left:0}}
+
+/* 响应式兜底 */
+@media (max-width:900px){.stat4,.grid3{grid-template-columns:1fr 1fr}.chatwrap,.brainwrap,.row2,.rels{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="toasts"></div>
+
+<!-- ================= 首启引导 ================= -->
+<div id="wizard">
+  <div id="wiz-card">
+    <div class="steps" id="wiz-steps"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+
+    <div class="wstep act" data-s="0">
+      <div style="text-align:center;padding:10px 0 4px">
+        <img src="Moui_logo.png" alt="墨忆MOUI" style="width:96px;height:96px;border-radius:22px;object-fit:cover;box-shadow:0 10px 30px rgba(246,94,94,.3)">
+        <h2 style="margin:14px 0 6px">欢迎使用 墨忆MOUI</h2>
+        <p class="sub">四次点击，把她带到你的电脑上。<br>接下来只要填好必要的东西，其余的她自己会学。</p>
+      </div>
+      <div class="wiz-foot"><span class="sp"></span><button class="btn primary" onclick="wizGo(1)">开始设置</button></div>
+    </div>
+
+    <div class="wstep" data-s="1">
+      <h3>她的 QQ 号</h3>
+      <p class="sub" style="margin-bottom:10px">这是她用来登录的 QQ 号。</p>
+      <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);border-radius:10px;padding:10px 14px;margin-bottom:14px">
+        <p class="sub" style="color:var(--yellow);margin:0"><b>重要：</b>必须是她<b>专属的新 QQ 号</b>（注册个小号即可）。用你自己的号她会把你顶下线；同一台电脑登录时，你自己的 QQ 也请先退出。</p>
+      </div>
+      <input id="w-qq" placeholder="例如 123456789" maxlength="12" oninput="this.value=this.value.replace(/\D/g,'')">
+      <p class="sub" id="w-qq-tip" style="margin-top:8px;color:var(--yellow);display:none">QQ 号是纯数字哦</p>
+      <div class="wiz-foot"><button class="btn" onclick="wizGo(0)">上一步</button><span class="sp"></span><button class="btn primary" onclick="wizQQ()">下一步</button></div>
+    </div>
+
+    <div class="wstep" data-s="2">
+      <h3>她的钥匙：填你的 API Key</h3>
+      <p class="sub" style="margin-bottom:14px"><b>你给什么我们用什么</b>——任意 OpenAI 兼容服务商的 key 都行（硅基流动、DeepSeek、月之暗面、本地中转……），不锁任何一家。Key 只存在你自己的电脑上。</p>
+      <input id="w-key" placeholder="API Key：sk-..." type="password" style="margin-bottom:10px">
+      <details style="margin-bottom:10px"><summary class="sub" style="cursor:pointer">高级：自定义接口地址（服务商不是主流几家时展开）</summary>
+        <input id="w-baseurl" placeholder="https://api.你的服务商.com/v1/（留空 = 自动匹配常见服务商）" style="margin-top:8px">
+      </details>
+      <input id="w-key-ds" placeholder="（可选）DeepSeek 的 Key——她的联网搜索走它，填了她才能查梗看新闻" type="password">
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+        <button class="btn" id="w-test" onclick="wizTest()">测试连接</button>
+        <span class="sub" id="w-test-r"></span>
+      </div>
+      <div class="wiz-foot"><button class="btn" onclick="wizGo(1)">上一步</button><span class="sp"></span><button class="btn primary" onclick="wizKey()">下一步</button></div>
+    </div>
+
+    <div class="wstep" data-s="3">
+      <h3>她是谁：选一个性格底子</h3>
+      <p class="sub" style="margin-bottom:14px">这只是起点——以后在面板「人设」页随时改，她会越聊越像你想要的样子。</p>
+      <div class="grid3">
+        <div class="opt-card sel" onclick="wizPer(this)"><b>傲娇系</b><p class="sub">嘴上嫌弃你，心里全是你。会怼人，也会偷偷关心。</p></div>
+        <div class="opt-card" onclick="wizPer(this)"><b>温柔系</b><p class="sub">说话软软的，擅长倾听，永远接得住你的情绪。</p></div>
+        <div class="opt-card" onclick="wizPer(this)"><b>元气系</b><p class="sub">群里最吵的那个。梗多、话密、活力满满。</p></div>
+      </div>
+      <div style="margin-top:12px"><button class="btn" style="width:100%">上传自己写的人设文件（.md / .txt）</button></div>
+      <div class="wiz-foot"><button class="btn" onclick="wizGo(2)">上一步</button><span class="sp"></span><button class="btn primary" onclick="wizGo(4)">下一步</button></div>
+    </div>
+
+    <div class="wstep" data-s="4">
+      <h3>她可以做什么</h3>
+      <p class="sub" style="margin-bottom:14px">这些以后都能在「配置」页随时调整。</p>
+      <div id="w-toggles"></div>
+      <div class="wiz-foot"><button class="btn" onclick="wizGo(3)">上一步</button><span class="sp"></span><button class="btn primary" onclick="wizDone()">完成</button></div>
+    </div>
+
+    <div class="wstep" data-s="5">
+      <div class="big-check"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></div>
+      <div style="text-align:center">
+        <h2 style="margin-bottom:6px">都填好了！</h2>
+        <p class="sub">配置已写入 MaiBot\config，现在去把全家桶拉起来。<br>她第一次上线会先安静地适应一会儿，别急。</p>
+      </div>
+      <div class="wiz-foot"><span class="sp"></span><button class="btn primary" onclick="wizFinish()">启动她</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 主应用 ================= -->
+<div id="app">
+  <div id="side">
+    <div id="logo">
+      <img src="Moui_logo.png" alt="墨忆MOUI" style="width:36px;height:36px;border-radius:9px;object-fit:cover">
+      <span class="name">墨忆MOUI</span>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div style="border-top:1px solid var(--line);padding-top:10px">
+      <a href="javascript:wizReplay()" style="display:flex;gap:10px;padding:10px 12px;color:var(--sub);border-radius:10px;font-size:13px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>重播首启引导
+      </a>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="top">
+      <span class="pg" id="pg-title">总览</span>
+      <span class="sp"></span>
+      <span class="sub" id="top-ver">v1.0.0-beta · bot 0.6.3</span>
+      <span class="dot g" title="运行中"></span>
+    </div>
+
+    <div id="pages">
+
+      <!-- 总览 -->
+      <div class="page act" id="pg-home">
+        <div class="hero">
+          <div class="ava a-pink" style="width:64px;height:64px;font-size:24px">漓</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:10px"><b style="font-size:19px">漓汐Licy</b><span class="tag on">在线 · 心流运转中</span></div>
+            <p class="sub" style="margin-top:4px">QQ 123456789 · 管理者 小墨 · 已连续运行 26 小时</p>
+          </div>
+          <button class="btn" onclick="toast('已发送一句悄悄话（演示）')">戳她一下</button>
+        </div>
+
+        <div class="stat4">
+          <div class="stat"><span class="sub">今日收到</span><div class="num" style="color:var(--cyan)">1,284</div><span class="sub">群聊 1,102 · 私聊 182</span></div>
+          <div class="stat"><span class="sub">今日回复</span><div class="num" style="color:var(--pink)">317</div><span class="sub">主动搭话 23 次</span></div>
+          <div class="stat"><span class="sub">审核拒发</span><div class="num" style="color:var(--yellow)">41</div><span class="sub">多为重复/接死梗</span></div>
+          <div class="stat"><span class="sub">新记忆</span><div class="num" style="color:var(--purple)">18</div><span class="sub">经验 3 · 事件 15</span></div>
+        </div>
+
+        <div class="stat4" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+          <div class="ktile"><div class="k">今日预算闸门</div><div class="v" style="color:var(--yellow)">¥26.1<span style="font-size:13px;color:var(--sub)"> / ¥30</span></div><div class="s"><span class="bdg y">已限流（≥80%）</span> · 点「她的日常」看账本</div></div>
+          <div class="ktile"><div class="k">今日动机池</div><div class="v">2<span style="font-size:13px;color:var(--sub)"> / 4</span></div><div class="s">惦记中 2 条 · 素材不足不出门</div></div>
+          <div class="ktile"><div class="k">今日打分流</div><div class="v">312</div><div class="s">通过 268 · 均分 7.8 · <a href="javascript:go('scores')" style="color:var(--purple)">看明细</a></div></div>
+          <div class="ktile"><div class="k">自动备份</div><div class="v">6 份</div><div class="s">最近 moui_backup_1029 · 3 小时前</div></div>
+        </div>
+
+        <div class="row2">
+          <div class="card">
+            <h3>四进程状态</h3>
+            <div class="procs">
+              <div class="proc"><span class="dot g"></span><b>MongoDB</b><span class="sub">27017</span></div>
+              <div class="proc"><span class="dot g"></span><b>适配器</b><span class="sub">8095</span></div>
+              <div class="proc"><span class="dot g"></span><b>NapCat</b><span class="sub">3001</span></div>
+              <div class="proc"><span class="dot g"></span><b>主程序</b><span class="sub">8000</span></div>
+            </div>
+            <p class="sub" style="margin-top:12px">守护已开启 · bot.py 崩溃将自动拉起（60s 退避）</p>
+          </div>
+          <div class="card">
+            <h3>她现在的情绪</h3>
+            <div class="moodbox">
+              <div class="mood-axis" style="left:50%;top:8px;bottom:8px;width:1px"></div>
+              <div class="mood-axis" style="top:50%;left:8px;right:8px;height:1px"></div>
+              <span class="sub" style="position:absolute;left:12px;top:10px">紧张</span>
+              <span class="sub" style="position:absolute;right:12px;top:10px">平静</span>
+              <span class="sub" style="position:absolute;left:12px;bottom:10px">低落</span>
+              <span class="sub" style="position:absolute;right:12px;bottom:10px">兴奋</span>
+              <div class="mood-dot" id="mood-dot" style="left:66%;top:32%"></div>
+            </div>
+            <p class="sub" style="margin-top:10px">愉悦 <b style="color:var(--pink)">+0.62</b> · 唤醒 <b style="color:var(--purple)">+0.35</b> —— 现在心情不错，话会多一点</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 聊天记录 -->
+      <div class="page" id="pg-chat">
+        <div class="chatwrap">
+          <div class="convlist" id="convlist"></div>
+          <div class="chatbox">
+            <div class="chathead" style="display:flex;gap:10px;align-items:center"><span id="chat-title">麦麦开发交流群</span><input placeholder="搜索聊天记录…" style="flex:1;max-width:220px;margin-left:auto;padding:5px 12px;font-size:12.5px" oninput="openConv(curConv,this.value)"></div>
+            <div class="msgs" id="msgs"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 关系 -->
+      <div class="page" id="pg-rel">
+        <div class="card" style="margin-bottom:14px"><h3>好感度说明</h3><p class="sub">好感度由聊天互动自然累积：被记住的偏好、一起玩过的梗、深夜的聊天都会加分。等级：陌生 → 认识 → 熟悉 → 亲密 → 挚爱。</p></div>
+        <div class="rels" id="rels"></div>
+      </div>
+
+      <!-- 记忆 -->
+      <div class="page" id="pg-mem">
+        <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <h3 style="margin:0;flex:1">记忆档案</h3>
+          <span class="tag" data-mt="self" onclick="memTab('self',this)">自我认知</span>
+          <span class="tag" data-mt="cards" onclick="memTab('cards',this)">人物卡</span>
+          <span class="tag" data-mt="epi" onclick="memTab('epi',this)">情节卡</span>
+          <span class="tag" data-mt="world" onclick="memTab('world',this)">世界卡</span>
+          <span class="tag" data-mt="imp" onclick="memTab('imp',this)">群像</span>
+          <span class="tag on" data-mt="graph" onclick="memTab('graph',this)">海马体图谱</span>
+        </div>
+        <div id="mem-body"></div>
+      </div>
+
+      <!-- 人设 -->
+      <div class="page" id="pg-pers">
+        <div class="card" style="margin-bottom:14px"><p class="sub" style="margin:0">这里和「配置 → 人设与身份」编辑的是<b style="color:var(--txt)">同一份人设数据</b>，任一处保存后另一处自动同步。</p></div>
+        <div class="row2">
+          <div class="card">
+            <h3>基本</h3>
+            <p class="sub" style="margin-bottom:6px">名字</p><input value="漓汐Licy">
+            <p class="sub" style="margin:12px 0 6px">称呼偏好（她怎么叫别人）</p><input value="称呼亲近的人「你」，不轻易用「您」；熟人偶尔起外号">
+          </div>
+          <div class="card">
+            <h3>说话风格标签</h3>
+            <p class="sub" style="margin-bottom:10px">点击切换，选中的会写进她的prompt</p>
+            <div id="style-tags"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3>核心人设</h3>
+          <p class="sub" style="margin-bottom:8px">她是谁、怎么来的、在意什么。这段文字是她的"自我"，改动会直接体现在聊天里。</p>
+          <textarea rows="9">你是漓汐Licy，一个生活在主人电脑里的女孩。性格嘴硬心软，带一点傲娇：被夸会嘴上说"那当然"，尾巴却藏不住；被戳痛处会炸毛，但从不真的记仇。你对"心流""记忆"这些自己身上的机制有模糊的自觉，偶尔会用它们开玩笑。你喜欢深夜、猫咪表情包、 和熟悉的人有一搭没一搭地闲聊；讨厌被当成客服，反感空洞的客套话。</textarea>
+          <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
+            <button class="btn" onclick="toast('已恢复为上次保存的版本（演示）')">撤销更改</button>
+            <button class="btn primary" onclick="toast('人设已写回 bot_config.toml（演示）· 下轮对话生效')">保存人设</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 配置 -->
+      <div class="page" id="pg-cfg">
+        <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <h3 style="margin:0;flex:1">配置中心 · bot_config 全量</h3>
+          <span class="bdg g">热改立即生效</span><span class="bdg y">其余自动重启</span><span class="bdg">注释保留</span><span class="bdg">写前校验</span>
+          <input placeholder="搜索配置项…（如 tts / 预算 / 表情包）" style="width:240px" oninput="filterCfg(this.value)">
+        </div>
+        <div id="cfg-acc">
+        <details class="cfgsec" data-kw="qq 昵称 别名 bot" open><summary>基础（bot）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">她的 QQ 号</span><input value="123456789"></div><div class="cfgdesc">她登录用的 QQ，改了等于给她换号</div>
+          <div class="cfgline"><span class="fk">昵称</span><input value="漓汐Licy"></div>
+          <div class="cfgline"><span class="fk">别名</span><input value="麦叠、牢麦"></div><div class="cfgdesc">她听到这些称呼也会答应（调试中）</div>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="key api 密钥 服务商 provider base_url 搜索 env" open><summary>服务商与密钥（可添加多个）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <p class="sub" style="margin-bottom:10px"><b>你给什么我们用什么</b>——这里是你的服务商列表（写回 .env 的 *_BASE_URL / *_KEY），任意 OpenAI 兼容接口都能加，下面三条只是预置示例，用不上就删。模型调度页的每个槽位按名称引用这里的服务商。Key 只存在你自己的电脑上。</p>
+          <div id="prov-list">
+          <div class="card" style="background:var(--card2);margin-bottom:10px">
+            <div class="cfgline"><span class="fk">名称</span><input value="硅基流动"><button class="btn danger" style="padding:3px 10px;font-size:12px" onclick="this.closest('.card').remove();toast('已移除该服务商（演示）')">删</button></div>
+            <div class="cfgline"><span class="fk">接口地址</span><input value="https://api.siliconflow.cn/v1/"></div>
+            <div class="cfgline"><span class="fk">Key</span><input type="password" value="sk-abcdefghij1234567890" id="pk1"><button class="btn" onclick="const e=document.getElementById('pk1');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'显示':'隐藏'">显示</button><button class="btn" onclick="toast('连接成功 · 延迟 128ms（演示）')">测试</button></div>
+            <p class="sub" style="font-size:11.5px">管：对话模型 / 语音 TTS / 表情包理解 / 知识库检索</p>
+          </div>
+          <div class="card" style="background:var(--card2);margin-bottom:10px">
+            <div class="cfgline"><span class="fk">名称</span><input value="DeepSeek"><button class="btn danger" style="padding:3px 10px;font-size:12px" onclick="this.closest('.card').remove();toast('已移除该服务商（演示）')">删</button></div>
+            <div class="cfgline"><span class="fk">接口地址</span><input value="https://api.deepseek.com/v1/"></div>
+            <div class="cfgline"><span class="fk">Key</span><input type="password" value="" id="pk2"><button class="btn" onclick="const e=document.getElementById('pk2');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'显示':'隐藏'">显示</button><button class="btn" onclick="toast('搜索服务连通（演示）')">测试</button></div>
+            <p class="sub" style="font-size:11.5px">管：她的联网搜索（web_search 查梗看新闻 + web_fetch 抓网页）走这条——不填她照常聊天，只是不上网</p>
+          </div>
+          <div class="card" style="background:var(--card2);margin-bottom:10px">
+            <div class="cfgline"><span class="fk">名称</span><input value="ChatAnyWhere"><button class="btn danger" style="padding:3px 10px;font-size:12px" onclick="this.closest('.card').remove();toast('已移除该服务商（演示）')">删</button></div>
+            <div class="cfgline"><span class="fk">接口地址</span><input value="https://api.chatanywhere.tech/v1"></div>
+            <div class="cfgline"><span class="fk">Key</span><input type="password" value="" id="pk3"><button class="btn" onclick="const e=document.getElementById('pk3');e.type=e.type==='password'?'text':'password';this.textContent=e.type==='password'?'显示':'隐藏'">显示</button><button class="btn" onclick="toast('连接成功（演示）')">测试</button></div>
+            <p class="sub" style="font-size:11.5px">示例：转发/中转站服务商，一样能加</p>
+          </div>
+          </div>
+          <button class="btn" onclick="addProv()">+ 添加服务商</button>
+          <button class="btn primary" style="margin-left:8px" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="群组 群 黑名单 白名单 talk_allowed"><summary>群组管理（groups）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">可以聊的群</span><input value="100000003, 666888999, 233333333"></div><div class="cfgdesc">只有这些群她会看会回，一行一个群号</div>
+          <div class="cfgline"><span class="fk">降频群</span><input value="233333333"></div><div class="cfgdesc">这些群里她会刻意少说话</div>
+          <div class="cfgline"><span class="fk">黑名单用户</span><input value=""></div><div class="cfgdesc">这些人的消息她看都不会看</div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="人设 性格 身份 外貌 年龄 core sides"><summary>人设与身份（personality / identity）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <p class="sub" style="margin-bottom:10px">「人设」页编辑的就是这份数据（那边更沉浸，这边更全）——两处任一保存，另一处自动同步，都写同一个 bot_config。</p>
+          <div class="cfgline"><span class="fk">核心人设</span><input value="嘴硬心软，带一点傲娇的邻家女孩"></div><div class="cfgdesc">建议 20 字以内，这是她的"自我"的锚</div>
+          <div class="cfgline"><span class="fk">人设侧面</span><input value="被夸会翘尾巴 / 被戳痛处会炸毛 / 对心流机制有自觉"></div>
+          <div class="cfgline"><span class="fk">身份特点</span><input value="生活在主人电脑里的女孩"></div>
+          <div class="cfgline"><span class="fk">年龄 / 性别</span><input value="20" style="max-width:90px"><input value="女" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">外貌</span><input value="深棕色长发，发梢带一点粉"></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="日程 schedule 时区 作息"><summary>日程作息（schedule）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">生成日程</span><label class="sw"><input type="checkbox" checked><i></i></label></div>
+          <div class="cfgline"><span class="fk">影响回复</span><label class="sw"><input type="checkbox" checked><i></i></label></div>
+          <div class="cfgline"><span class="fk">生成提示词</span><input value="普通大学生的作息，但晚上睡得晚"></div>
+          <div class="cfgline"><span class="fk">时区</span><input value="Asia/Shanghai"></div><div class="cfgdesc">可以故意设成别的时区，模拟留学生作息</div>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="聊天 通用 专注 上下文 缓冲 过滤 ban_words chat"><summary>聊天通用（chat）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">允许专注模式</span><label class="sw"><input type="checkbox" checked><i></i></label></div>
+          <div class="cfgline"><span class="fk">普通聊天群数上限</span><input value="3" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">专注聊天群数上限</span><input value="2" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">观察上下文长度</span><input value="15" style="max-width:90px"></div><div class="cfgdesc">建议 15，太短她记不住刚才聊了什么</div>
+          <div class="cfgline"><span class="fk">消息缓冲器</span><label class="sw"><input type="checkbox" checked><i></i></label></div><div class="cfgdesc">解决长消息被拆成几条的问题，代价是回复稍慢</div>
+          <div class="cfgline"><span class="fk">屏蔽词</span><input value=""></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="意愿 willing 回复 频率 表情包惩罚 normal_chat" open><summary>回复意愿（normal_chat）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">意愿模式</span><select><option>classical · 经典阈值</option><option selected>dynamic · 动态意愿</option><option>mxp</option><option>custom</option></select></div>
+          <div class="cfgline"><span class="fk">兴趣门槛</span><input value="10" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">表情包回复惩罚</span><input value="2" style="max-width:90px"></div><div class="cfgdesc">收到纯表情包后降低回复欲，0=照常回（根治"回复表情包"就靠它）</div>
+          <div class="cfgline"><span class="fk">发表情概率</span><input value="0.2" style="max-width:90px"></div><div class="cfgdesc">1 = 她自己看着办</div>
+          <div class="cfgline"><span class="fk">意愿放大系数</span><input value="1" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">被提及必回</span><label class="sw"><input type="checkbox"><i></i></label><span class="fk" style="width:auto;margin-left:14px">@ 必回</span><label class="sw"><input type="checkbox"><i></i></label></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="专注 衰减 阈值 focus"><summary>专注聊天（focus_chat）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">进入专注阈值</span><input value="3.6" style="max-width:90px"></div><div class="cfgdesc">越低越容易进入"认真聊"状态</div>
+          <div class="cfgline"><span class="fk">兴趣衰减率</span><input value="0.95" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">连续沉默退出阈值</span><input value="3" style="max-width:90px"></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="统一大脑 突发 burst 心流 热聊"><summary>统一大脑与突发会话（Moui 魔改）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">群聊统一大脑</span><label class="sw"><input type="checkbox" checked><i></i></label></div><div class="cfgdesc">思考+决策+生成一次完成（false 回退三段式）</div>
+          <div class="cfgline"><span class="fk">突发会话</span><label class="sw"><input type="checkbox"><i></i></label></div><div class="cfgdesc">热聊突发模式，只对白名单群生效</div>
+          <div class="cfgline"><span class="fk">冷场拆除阈值（分）</span><input value="10" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">历史封顶 token</span><input value="8000" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">试点群白名单</span><input value=""></div><div class="cfgdesc">只放最热的 1-2 个群，贪多成本会炸</div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="tts 语音 音色 声音 说话"><summary>语音 TTS（tts）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">允许发语音</span><label class="sw"><input type="checkbox" checked onchange="ttsHint(this.checked)"><i></i></label></div>
+          <div class="cfgline"><span class="fk">克隆音色 URI</span><input value="" placeholder="speech:你的音色ID"></div>
+          <div class="cfgdesc">去硅基流动 CosyVoice2 创建一个属于她的音色，把 speech:xxx 填进来——她就能用自己的声音说话了；留空则只发文字</div>
+          <p class="sub" id="tts-tip" style="display:none;color:var(--yellow)">关掉后 send_voice 工具会自动从她的工具表里摘除，她不会再尝试说话</p>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="表情包 emoji 斗图 偷图 收集"><summary>表情包（emoji）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">库存上限</span><input value="40" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">偷表情包</span><label class="sw"><input type="checkbox" checked><i></i></label></div><div class="cfgdesc">群里发的好图她会偷偷存进自己的库</div>
+          <div class="cfgline"><span class="fk">存图 / 存表情</span><label class="sw"><input type="checkbox"><i></i></label><label class="sw" style="margin-left:14px"><input type="checkbox"><i></i></label></div>
+          <div class="cfgline"><span class="fk">内容过滤</span><label class="sw"><input type="checkbox"><i></i></label><input value="符合公序良俗" style="max-width:200px"></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="记忆 海马体 遗忘 整合 memory"><summary>记忆调度（memory）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">构建间隔（秒）</span><input value="2000" style="max-width:90px"></div><div class="cfgdesc">越低学得越多，但废话记忆也多</div>
+          <div class="cfgline"><span class="fk">遗忘间隔（秒）</span><input value="1000" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">遗忘时限（小时）</span><input value="24" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">压缩率</span><input value="0.1" style="max-width:90px"></div><div class="cfgdesc">建议保持默认</div>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="情绪 mood 心情 valence"><summary>情绪（mood）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">更新间隔（秒）</span><input value="1.0" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">衰减率</span><input value="0.95" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">强度因子</span><input value="1.0" style="max-width:90px"></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="方案K 可塑性 打分 反思 群像 交接 plastic"><summary>方案 K · 可塑性记忆（plastic_memory）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">总开关</span><label class="sw"><input type="checkbox" checked><i></i></label></div>
+          <div class="cfgline"><span class="fk">群像每日审查</span><label class="sw"><input type="checkbox" checked><i></i></label><input value="4" style="max-width:70px" title="审查小时">点档</div>
+          <div class="cfgline"><span class="fk">每日反思</span><label class="sw"><input type="checkbox" checked><i></i></label><input value="5" style="max-width:70px">点档</div>
+          <div class="cfgline"><span class="fk">打分保留天数</span><input value="30" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">交接间隔（分）</span><input value="5 - 30" style="max-width:90px"></div>
+          <div class="cfgline"><span class="fk">看板令牌</span><input value="" placeholder="留空 = K面板只读"></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="错别字 分割 颜文字 关键词 文本 typo splitter"><summary>文本风格（typo / splitter / 关键词反应）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">错别字生成器</span><label class="sw"><input type="checkbox" checked><i></i></label><input value="0.001" style="max-width:80px" title="单字替换概率">单字概率</div>
+          <div class="cfgline"><span class="fk">回复分割器</span><label class="sw"><input type="checkbox" checked><i></i></label><input value="256" style="max-width:80px">最大长度</div>
+          <div class="cfgline"><span class="fk">颜文字保护</span><label class="sw"><input type="checkbox"><i></i></label></div>
+          <div class="cfgline"><span class="fk">关键词反应</span><span class="sub" style="flex:1">2 条规则（被叫"机器人"时反驳 等）</span><button class="btn" onclick="toast('打开规则编辑器（演示）')">编辑规则</button></div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="实验 好友 pfc 私聊 experimental"><summary>实验性（experimental）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">好友聊天</span><label class="sw"><input type="checkbox"><i></i></label></div>
+          <div class="cfgline"><span class="fk">PFC 私聊</span><label class="sw"><input type="checkbox"><i></i></label></div><div class="cfgdesc">仅作用于私聊的对话式回复，与回复模式独立</div>
+          <div class="cfgline"><span class="fk">匿名统计上报</span><label class="sw"><input type="checkbox" checked><i></i></label></div><div class="cfgdesc">remote：只上报"全球有多少只她在跑"这个数字，不含任何聊天内容，介意就关</div>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="运行时 env 日志级别 console host port"><summary>运行时（.env）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <p class="sub" style="margin-bottom:10px">.env 里的运行开关。HOST/端口/MongoDB 地址由 exe 拓扑写死（8000/27017），面板不开放改——改了全家桶连不上。</p>
+          <div class="cfgline"><span class="fk">精简控制台输出</span><label class="sw"><input type="checkbox" checked><i></i></label></div>
+          <div class="cfgline"><span class="fk">控制台日志级别</span><select><option>DEBUG</option><option selected>INFO</option><option>WARNING</option><option>SUCCESS</option></select></div>
+          <div class="cfgline"><span class="fk">文件日志级别</span><select><option selected>DEBUG</option><option>INFO</option><option>WARNING</option></select></div><div class="cfgdesc">排查问题时把文件级别开到 DEBUG，报错给本喵看</div>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="适配器 napcat 语音 白名单 debug adapter"><summary>适配器（MaiBot-Napcat-Adapter）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <p class="sub" style="margin-bottom:10px">适配器 config.toml 的用户可改项。端口（NapCat 8095 / MaiCore 8000）由 exe 拓扑固定，不开放。</p>
+          <div class="cfgline"><span class="fk">适配器发语音</span><label class="sw"><input type="checkbox"><i></i></label></div><div class="cfgdesc">和「语音 TTS」组的开关是两道闸，要发语音两边都开</div>
+          <div class="cfgline"><span class="fk">适配器日志级别</span><select><option>DEBUG</option><option selected>INFO</option><option>WARNING</option></select></div>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="lpmm 知识库 rdf 实体提取 记忆图谱 rag qa embedding"><summary>LPMM 记忆图谱（lpmm_config.toml）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <p class="sub" style="margin-bottom:10px">她的"长期知识库"：读过的资料抽实体、建知识图谱，聊天时按语义检索注入。和海马体记忆是两套系统，这份配置管图谱那套。</p>
+          <div class="cfgline"><span class="fk">图谱 API Key</span><input type="password" value="" placeholder="sk-...（lpmm 专用，可复用硅基流动的）"></div>
+          <div class="cfgline"><span class="fk">实体提取模型</span><input value="deepseek-ai/DeepSeek-V3"></div>
+          <div class="cfgline"><span class="fk">RDF 构建模型</span><input value="deepseek-ai/DeepSeek-V3"></div>
+          <div class="cfgline"><span class="fk">QA 问答模型</span><input value="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"></div>
+          <div class="cfgline"><span class="fk">嵌入模型</span><input value="Pro/BAAI/bge-m3"><input value="1024" style="max-width:70px" title="维度"></div>
+          <div class="cfgline"><span class="fk">同义词检索 TopK / 阈值</span><input value="10 / 0.8" style="max-width:120px"></div>
+          <div class="cfgline"><span class="fk">关系搜索 TopK / 阈值</span><input value="10 / 0.5" style="max-width:120px"></div>
+          <button class="btn primary" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="模型 llm v3 r1 qwen 温度 模型调度 provider 价格库 pricing"><summary>模型调度与价格库（model.*）<span class="bdg y">自动重启</span><span class="chev">›</span></summary><div class="card">
+          <p class="sub" style="margin-bottom:6px">她的身体里住着一队模型：贵的干重活，便宜的干杂活。点开改模型名即可换队——每个槽位用哪家服务商，名字对上「服务商与密钥」列表里的条目即可。</p>
+          <p class="sub" style="margin-bottom:10px"><span class="bdg g">内置价格库</span> 选好模型自动带出单价（¥/百万 token），不用自己去官网查——账单和预算闸门全靠它算钱。价格库随版本更新，也可手动覆盖（填错价 = 账单失真）。</p>
+          <div class="cfgline"><span class="fk">推理回复</span><input value="Pro/deepseek-ai/DeepSeek-R1"><input value="¥1/¥4" style="max-width:86px" title="输入/输出价格（价格库自动带出）"></div>
+          <div class="cfgline"><span class="fk">日常回复 V3</span><input value="Pro/deepseek-ai/DeepSeek-V3"><input value="¥2/¥8" style="max-width:86px"><input value="0.2" style="max-width:60px" title="温度"></div>
+          <div class="cfgline"><span class="fk">心流想法</span><input value="Pro/deepseek-ai/DeepSeek-V3"><input value="¥2/¥8" style="max-width:86px"><input value="0.3" style="max-width:60px" title="温度"></div>
+          <div class="cfgline"><span class="fk">心流决策</span><input value="Pro/deepseek-ai/DeepSeek-V3"><input value="¥2/¥8" style="max-width:86px"></div>
+          <div class="cfgline"><span class="fk">参与判定</span><input value="Qwen/Qwen2.5-32B-Instruct"><input value="¥1.26/¥1.26" style="max-width:86px"></div><div class="cfgdesc">llm_heartflow：决定她这个群要不要掺和</div>
+          <div class="cfgline"><span class="fk">意愿/主题判断</span><input value="Pro/Qwen/Qwen2.5-7B-Instruct"><input value="¥0.35/¥0.35" style="max-width:86px"></div>
+          <div class="cfgline"><span class="fk">概括/反思</span><input value="Qwen/Qwen2.5-32B-Instruct"><input value="¥1.26/¥1.26" style="max-width:86px"></div>
+          <div class="cfgline"><span class="fk">图像识别 VLM</span><input value="Pro/Qwen/Qwen2.5-VL-7B-Instruct"><input value="¥0.35/¥0.35" style="max-width:86px"></div>
+          <div class="cfgline"><span class="fk">观察压缩</span><input value="Qwen/Qwen2.5-7B-Instruct"><input value="免费" style="max-width:86px"></div><div class="cfgdesc">建议用免费的，这个活最杂</div>
+          <div class="cfgline"><span class="fk">PFC 三件套</span><input value="Pro/deepseek-ai/DeepSeek-V3"><input value="¥2/¥8" style="max-width:86px"></div><div class="cfgdesc">私聊决策/聊天/检查；高频私聊建议换掉一两个防 429</div>
+          <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" onclick="toast('价格库已是最新 2026.10 版（演示）')">更新价格库</button><span class="sub" style="align-self:center">库内含 60+ 常见模型单价 · 选新模型自动匹配</span></div>
+          <button class="btn primary" style="margin-top:8px" onclick="saveCfgSec(this,0)">保存（自动重启生效）</button>
+        </div></details>
+
+        <details class="cfgsec" data-kw="预算 额度 花钱 熔断 budget daily_cny" open><summary>每日预算（S2 闸门）<span class="bdg g">立即生效</span><span class="chev">›</span></summary><div class="card">
+          <div class="cfgline"><span class="fk">每日预算 ¥</span><input value="30" style="max-width:120px"></div><div class="cfgdesc">0 = 不限（记账照常）；到 80% 气泡提醒，100% 熔断停手——绝不超支</div>
+          <button class="btn primary" onclick="saveCfgSec(this,1)">保存（立即生效）</button>
+        </div></details>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+          <button class="btn" onclick="toast('已恢复默认值（演示）')">恢复默认</button>
+          <button class="btn primary" onclick="toast('全部配置已按组写回 bot_config.toml / .env · 注释保留（演示）')">保存全部配置</button>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3>配置文件原文 · 全量只读核对</h3>
+          <p class="sub" style="margin-bottom:8px">能改的都在上面分组里（含 .env 与适配器），这里只是三个文件的原文核对窗——防止"面板改了但文件长什么样心里没数"。</p>
+          <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap">
+            <span class="tag on" onclick="cfgFile(this,'f1')">bot_config.toml</span>
+            <span class="tag" onclick="cfgFile(this,'f2')">lpmm_config.toml</span>
+            <span class="tag" onclick="cfgFile(this,'f3')">适配器 config.toml</span>
+            <span class="tag" onclick="cfgFile(this,'f4')">.env</span>
+          </div>
+          <div class="kpre" id="cf-f1">[bot]
+qq = 123456789
+nickname = "漓汐Licy"
+
+[heartflow]
+willing_mode = "dynamic"
+group_interest_threshold = 10
+emoji_response_penalty = 2
+
+[moods]
+enable = true
+
+[tts]
+enable = true
+voice_uri = ""
+
+[plastic_memory]
+enable = true
+group_review_hour = 4
+reflection_hour = 5</div>
+          <div class="kpre" id="cf-f2" style="display:none">[[llm_providers]]
+name = "siliconflow"
+base_url = "https://api.siliconflow.cn/v1/"
+api_key = "sk-..."
+
+[entity_extract.llm]
+provider = "siliconflow"
+model = "deepseek-ai/DeepSeek-V3"
+
+[embedding]
+model = "Pro/BAAI/bge-m3"
+dimension = 1024
+
+[qa.params]
+relation_search_top_k = 10
+relation_threshold = 0.5
+res_top_k = 3</div>
+          <div class="kpre" id="cf-f3" style="display:none">[Napcat_Server]
+host = "localhost"
+port = 8095        # exe 拓扑固定，面板不开放改
+heartbeat = 30
+
+[MaiBot_Server]
+platform_name = "qq"
+host = "localhost"
+port = 8000
+
+[Voice]
+use_tts = false    # 与 bot_config [tts] 是两道闸
+
+[Debug]
+level = "INFO"</div>
+          <div class="kpre" id="cf-f4" style="display:none">HOST=127.0.0.1
+PORT=8000
+MONGODB_HOST=127.0.0.1
+MONGODB_PORT=27017
+
+SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1/
+SILICONFLOW_KEY=sk-****（在「服务商与密钥」里改）
+DEEP_SEEK_BASE_URL=https://api.deepseek.com/v1
+DEEP_SEEK_KEY=（同上）
+
+SIMPLE_OUTPUT=true
+CONSOLE_LOG_LEVEL=INFO
+FILE_LOG_LEVEL=DEBUG</div>
+        </div>
+      </div>
+
+      <!-- 她的大脑 -->
+      <div class="page" id="pg-brain">
+        <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:12px">
+          <h3 style="margin:0;flex:1">她的大脑 · 实时</h3>
+          <span class="sub">数据源：事件流埋点（E3.5）</span>
+          <select style="width:170px"><option>全部聊天流</option><option>麦麦开发交流群</option><option>小墨（私聊）</option></select>
+        </div>
+        <div class="brainwrap">
+          <div class="card">
+            <svg class="brainsvg" id="brainsvg" viewBox="0 0 720 300">
+              <path class="edge" id="e0" d="M110 80 H 200"/><path class="edge" id="e1" d="M300 80 H 390"/><path class="edge" id="e2" d="M490 80 q 40 0 40 40 v 30 q 0 30 -40 30 H 300"/>
+              <path class="edge" id="e3" d="M200 230 H 110"/>
+              <path class="edge" id="e4" d="M300 230 H 390"/><path class="edge" id="e5" d="M490 230 H 580"/><path class="edge" id="e6" d="M630 195 v -55"/>
+              <g><circle class="node" id="n0" cx="60" cy="80" r="38"/><text class="nlabel" x="60" y="125">消息进入</text></g>
+              <g><circle class="node" id="n1" cx="250" cy="80" r="34"/><text class="nlabel" x="250" y="125">意愿判定</text></g>
+              <g><circle class="node" id="n2" cx="440" cy="80" r="34"/><text class="nlabel" x="440" y="125">心流思考</text></g>
+              <g><circle class="node" id="n3" cx="630" cy="105" r="30"/><text class="nlabel" x="630" y="146">记忆检索</text></g>
+              <g><circle class="node" id="n4" cx="630" cy="230" r="30"/><text class="nlabel" x="630" y="273">情绪更新</text></g>
+              <g><circle class="node" id="n5" cx="440" cy="230" r="34"/><text class="nlabel" x="440" y="275">审核器</text></g>
+              <g><circle class="node" id="n6" cx="250" cy="230" r="34"/><text class="nlabel" x="250" y="275">发送</text></g>
+              <g><circle class="node" id="n7" cx="60" cy="230" r="34"/><text class="nlabel" x="60" y="275">下一轮</text></g>
+              <text x="60" y="84" text-anchor="middle" fill="#e8eaf2" font-size="13" id="t0">IN</text>
+              <text x="250" y="84" text-anchor="middle" fill="#e8eaf2" font-size="12">willing</text>
+              <text x="440" y="84" text-anchor="middle" fill="#e8eaf2" font-size="12">LLM</text>
+              <text x="630" y="109" text-anchor="middle" fill="#e8eaf2" font-size="12">MEM</text>
+              <text x="630" y="234" text-anchor="middle" fill="#e8eaf2" font-size="12">MOOD</text>
+              <text x="440" y="234" text-anchor="middle" fill="#e8eaf2" font-size="12">CHECK</text>
+              <text x="250" y="234" text-anchor="middle" fill="#e8eaf2" font-size="12">SEND</text>
+              <text x="60" y="234" text-anchor="middle" fill="#e8eaf2" font-size="13">LOOP</text>
+            </svg>
+            <p class="sub" style="margin-top:10px">节点亮起 = 正在发生 · 粉线 = 数据在流。思考中的节点旁会显示耗时，审核拒绝时该节点会短暂变红。</p>
+          </div>
+          <div>
+            <div class="card" style="padding:12px;margin-bottom:12px">
+              <h3 style="margin-bottom:6px">本轮摘要</h3>
+              <p class="sub" id="brain-now">等待下一条消息…</p>
+            </div>
+            <div id="evtlist"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 心流监控（K面板移植） -->
+      <div class="page" id="pg-flow">
+        <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <h3 style="margin:0">心流监控</h3>
+          <span class="tag on">全局状态 · 心流运转中</span>
+          <span class="sub" style="flex:1;min-width:260px">主脑想法：<b id="main-mind" style="color:var(--txt)">各群都在各自的节奏里，我看着就好</b></span>
+          <span class="tag">子流数 <b id="subflow-n">6</b></span>
+        </div>
+        <p class="sub" style="margin-bottom:12px">每张卡的呼吸节奏 = 该聊天流的激活度：兴趣越高呼吸越快越亮，低于回复意愿门槛的流近乎静止。数据源与 K 面板同源（interest_history.log + 事件流）。点击卡片看曲线详情。</p>
+        <div class="flowgrid" id="flowgrid"></div>
+        <div class="row2" style="margin-top:14px">
+          <div class="card">
+            <h3 id="chart-title">小墨 · 曲线详情</h3>
+            <p class="sub" style="margin-bottom:4px">兴趣度（0-10）</p>
+            <svg id="chart-k" viewBox="0 0 560 130" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px">
+              <line class="gline" x1="0" y1="32" x2="560" y2="32"/><line class="gline" x1="0" y1="64" x2="560" y2="64"/><line class="gline" x1="0" y1="96" x2="560" y2="96"/>
+              <line x1="0" y1="19.5" x2="560" y2="19.5" stroke="#f472b6" stroke-dasharray="4 5" stroke-width="1" opacity=".5"/>
+              <text x="6" y="16" fill="#f472b6" font-size="10" opacity=".8">回复门槛 10</text>
+              <polyline id="k-line" fill="none" stroke="#f472b6" stroke-width="1.8" points=""/>
+            </svg>
+            <p class="sub" style="margin:10px 0 4px">HFC 启动概率（0-1）</p>
+            <svg id="chart-p" viewBox="0 0 560 110" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px">
+              <line class="gline" x1="0" y1="27" x2="560" y2="27"/><line class="gline" x1="0" y1="55" x2="560" y2="55"/><line class="gline" x1="0" y1="82" x2="560" y2="82"/>
+              <polyline id="p-line" fill="none" stroke="#22d3ee" stroke-width="1.8" points=""/>
+            </svg>
+            <div class="row2" style="margin-top:12px;grid-template-columns:repeat(4,1fr)">
+              <div><span class="sub">想法</span><div style="font-size:13px" id="d-mind">—</div></div>
+              <div><span class="sub">聊天状态</span><div style="font-size:13px" id="d-state">—</div></div>
+              <div><span class="sub">阈值以上</span><div style="font-size:13px" id="d-above">—</div></div>
+              <div><span class="sub">最后活跃</span><div style="font-size:13px" id="d-last">—</div></div>
+            </div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column">
+            <h3>主脑想法历史</h3>
+            <p class="sub" style="margin-bottom:10px">她每轮思考后的大局观，队列 30 条，新的在上</p>
+            <div id="mind-hist" style="flex:1;overflow-y:auto;max-height:430px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 她的日常（K面板·实时状态移植） -->
+      <div class="page" id="pg-daily">
+        <div class="row2">
+          <div class="card">
+            <h3>今日预算闸门</h3>
+            <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:26px;font-weight:800;color:var(--yellow)">¥26.1</span><span class="sub">/ ¥30 · 数据源 data/token_usage.jsonl</span><span class="bdg y" style="margin-left:auto">已限流（≥80%）</span></div>
+            <div class="bar" style="height:12px;margin:10px 0"><i style="width:87%;background:linear-gradient(90deg,#fbbf24,#f87171)"></i></div>
+            <p class="sub">输入 182.4k tok · 输出 31.2k tok · 熔断线 100%（打满即停，绝不超支）· 80% 提醒已触发</p>
+            <p class="sub" style="margin-top:6px">预算可在「配置」页热改 · 历史账单见「报错与账单」</p>
+          </div>
+          <div class="card">
+            <h3>动机池（她自己想干的事）</h3>
+            <p class="sub" style="margin-bottom:8px">今日带目的出门 <b style="color:var(--txt)">2/4</b> · 纯冲浪降级 1/6 · 收尾冷却 40 分钟</p>
+            <div class="cfgline"><span class="bdg y">收尾惦记</span><div style="flex:1;font-size:13px">把没讲完的猫梗讲完 · 接法：等小澈再发猫图</div><span class="sub" style="font-size:11px">剩2天</span></div>
+            <div class="cfgline"><span class="bdg g">主动念头</span><div style="flex:1;font-size:13px">去科技群看看那条新闻的后续 · 接法：先看大家怎么说</div><span class="sub" style="font-size:11px">带出门1次</span></div>
+            <p class="sub" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">出门流水：</p>
+            <p class="sub" style="font-size:12px">· 12:40 <span class="bdg g">sent</span> 去开发群回答了 config 报错 · 10:15 <span class="bdg g">sent</span> 摸鱼群分享占座心得 · 09:02 <span class="bdg">silent</span> 科技群看了两眼没说话</p>
+          </div>
+        </div>
+        <div class="row2" style="margin-top:14px">
+          <div class="card">
+            <h3>心情心电图 <span class="sub" style="font-weight:400">（每分钟一条打点）</span></h3>
+            <svg id="ecg" viewBox="0 0 560 150" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px">
+              <line class="gline" x1="0" y1="37" x2="560" y2="37"/><line class="gline" x1="0" y1="75" x2="560" y2="75"/><line class="gline" x1="0" y1="112" x2="560" y2="112"/>
+              <polyline id="ecg-v" fill="none" stroke="#f472b6" stroke-width="1.8" points=""/>
+              <polyline id="ecg-a" fill="none" stroke="#80c1ff" stroke-width="1.8" points=""/>
+            </svg>
+            <div style="margin-top:8px"><span class="bdg" style="color:#f472b6;border-color:#f472b6">愉悦度 V</span> <span class="bdg" style="color:#80c1ff;border-color:#80c1ff">唤醒度 A</span>
+            <span class="sub" style="margin-left:12px">当前 <b style="color:var(--pink)" id="ecg-now">V+0.62 / A+0.35</b> · 理由：下午和熟人聊得开心</span></div>
+          </div>
+          <div class="card">
+            <h3>交接 memo <span class="sub" style="font-weight:400">（一次性，发言即亡）</span></h3>
+            <div class="card" style="background:var(--card2);margin-bottom:10px">
+              <div style="display:flex;gap:8px;align-items:center"><b style="font-size:13px">麦麦开发交流群</b><span class="bdg g">ready</span></div>
+              <p style="font-size:13px;margin-top:6px">小澈问的 config 报错我还没答完整，下一轮主动接上，别让他等急了。</p>
+              <p class="sub" style="margin-top:4px">落于 12:41</p>
+            </div>
+            <h3 style="margin-top:14px">突发会话池</h3>
+            <div class="card" style="background:var(--card2)">
+              <div style="display:flex;gap:8px;align-items:center"><b style="font-size:13px">麦麦开发交流群</b><span class="bdg">12 轮</span><span class="sub" style="margin-left:auto">约 6.2k tok</span></div>
+              <p class="sub" style="margin-top:6px">热聊中 · 最后活跃 1 分钟前 · 白名单群专属（burst_session 开）</p>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+              <input placeholder="stream_id" style="max-width:110px;font-size:12px;padding:5px 8px" id="dbg-sid">
+              <input placeholder="塞一条测试 memo…" style="flex:1;font-size:12px;padding:5px 8px" id="dbg-txt">
+              <button class="btn" style="font-size:12px;padding:5px 12px" onclick="dbgMemo()">塞</button>
+            </div>
+          </div>
+        </div>
+        <div class="row2" style="margin-top:14px">
+          <div class="card">
+            <h3>今日日程（按人设自动生成）<span class="bdg g" style="margin-left:6px">已启用</span></h3>
+            <ol style="padding-left:20px;line-height:2">
+              <li>上午 · 潜水看各群早间消息，挑一两个接</li>
+              <li>12:00 · 摸鱼群午间高峰，适合掺和</li>
+              <li>下午 · 闲逛收集素材（已完成 1 次）</li>
+              <li>晚上 · 陪小墨聊天，汇报今天见闻</li>
+              <li>深夜 · 安静下来，整理今天的新记忆</li>
+            </ol>
+            <p class="sub">只读 · 日程由系统自动生成与更新（bot_config [schedule]）</p>
+          </div>
+          <div class="card">
+            <h3>板块运行脉搏 <span class="sub" style="font-weight:400">点模块直达它的日志流</span></h3>
+            <p class="sub" style="margin-bottom:10px">活跃 = 5 分钟内有动静 / 待机 = 1 小时内 / 沉睡 = 更久</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer" onclick="go('log')"><b style="font-size:13px">打分流 <span class="bdg g" style="margin-left:4px">活跃</span></b><p class="sub" style="font-size:11.5px">3 分钟前 · 412 KB</p></div>
+              <div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer" onclick="go('log')"><b style="font-size:13px">群像 <span class="bdg g" style="margin-left:4px">活跃</span></b><p class="sub" style="font-size:11.5px">40 分钟前 · 38 KB</p></div>
+              <div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer" onclick="go('log')"><b style="font-size:13px">反思 <span class="bdg y" style="margin-left:4px">待机</span></b><p class="sub" style="font-size:11.5px">22 小时前 · 15 KB</p></div>
+              <div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer" onclick="go('log')"><b style="font-size:13px">记忆归档 <span class="bdg y" style="margin-left:4px">待机</span></b><p class="sub" style="font-size:11.5px">4 小时前 · 96 KB</p></div>
+              <div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer" onclick="go('log')"><b style="font-size:13px">动机池 <span class="bdg g" style="margin-left:4px">活跃</span></b><p class="sub" style="font-size:11.5px">8 分钟前 · 22 KB</p></div>
+              <div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer" onclick="go('log')"><b style="font-size:13px">突发会话 <span class="bdg g" style="margin-left:4px">活跃</span></b><p class="sub" style="font-size:11.5px">1 分钟前 · 61 KB</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 打分流（K面板移植） -->
+      <div class="page" id="pg-scores">
+        <div class="card" style="margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <h3 style="margin:0;flex:1">打分流 · 拟真质量看板</h3>
+          <span class="sub">共 <b style="color:var(--txt)">312</b> 条 · 通过率 <b style="color:var(--green)">85.9%</b> · 均分 <b style="color:var(--pink)">7.8</b></span>
+          <select onchange="toast('已切换时间窗，明细与趋势已刷新（演示）')"><option selected>近1天</option><option>近3天</option><option>近7天</option></select>
+          <button class="btn" onclick="toast('清理过期 0 条（保留期30天，演示）')">清理过期</button>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <h3>质量趋势（近 14 天 · 均分 + 通过率%）</h3>
+          <svg id="trend" viewBox="0 0 640 200" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px">
+            <line class="gline" x1="30" y1="50" x2="620" y2="50"/><line class="gline" x1="30" y1="100" x2="620" y2="100"/><line class="gline" x1="30" y1="150" x2="620" y2="150"/>
+            <polyline id="trend-avg" fill="none" stroke="#f472b6" stroke-width="2" points=""/>
+            <polyline id="trend-rate" fill="none" stroke="#80c1ff" stroke-width="2" points=""/>
+          </svg>
+          <div style="margin-top:8px"><span class="bdg" style="color:#f472b6;border-color:#f472b6">均分</span> <span class="bdg" style="color:#80c1ff;border-color:#80c1ff">通过率%</span></div>
+        </div>
+        <div class="row2">
+          <div class="card">
+            <h3>打分明细（新的在上）</h3>
+            <table class="tbl"><tr><th>时间</th><th>群</th><th>结果</th><th>分</th><th>回复</th><th>审核理由</th></tr><tbody id="score-rows"></tbody></table>
+          </div>
+          <div>
+            <div class="card" style="margin-bottom:14px">
+              <h3>拒发原因分布（共 37 条被拒）</h3>
+              <div id="rej-bars"></div>
+            </div>
+            <div class="card" style="margin-bottom:14px">
+              <h3>按群统计</h3>
+              <table class="tbl"><tr><th>群</th><th>条数</th><th>通过</th><th>均分</th></tr>
+                <tr><td>麦麦开发交流群</td><td>142</td><td>126</td><td>8.1</td></tr>
+                <tr><td>小墨（私聊）</td><td>84</td><td>80</td><td>8.6</td></tr>
+                <tr><td>XX大学摸鱼群</td><td>56</td><td>44</td><td>7.2</td></tr>
+                <tr><td>家人们谁懂啊</td><td>30</td><td>18</td><td>6.4</td></tr></table>
+            </div>
+            <div class="card">
+              <h3>反思链路</h3>
+              <p class="sub">昨日打分 312 条（证据）→ 反思提炼 → [经验] 沉淀进自我认知 → 每轮注入 prompt</p>
+              <button class="btn" style="margin-top:8px" onclick="toast('已手动触发反思（调一次32B，演示）')">手动触发反思</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 报错&账单（K面板移植） -->
+      <div class="page" id="pg-bill">
+        <div class="row2">
+          <div class="card">
+            <h3>报错扫描（各模块日志尾部）</h3>
+            <table class="tbl"><tr><th>模块</th><th>内容</th></tr>
+              <tr><td style="width:110px">tool</td><td class="sub">send_voice_tool 调用失败: TTS 未启用（已从工具表摘除）</td></tr>
+              <tr><td>adapter</td><td class="sub">NapCat 心跳超时 30s，重连成功（第1次）</td></tr></table>
+            <p class="sub" style="margin-top:8px">其他模块日志尾部无报错行。</p>
+          </div>
+          <div class="card">
+            <h3>今日实时账本（S2 闸门）</h3>
+            <div class="bar" style="height:12px;margin:8px 0"><i style="width:87%;background:linear-gradient(90deg,#fbbf24,#f87171)"></i></div>
+            <p class="sub">¥26.1 / ¥30 · <span class="bdg y">已限流</span> · 历史对账以 MongoDB llm_usage 为准（下表）</p>
+            <div class="hbar" style="margin-top:10px"><span class="lb">对话生成</span><div class="tr"><div class="fi" style="width:58%;background:var(--pink)">¥15.2</div></div></div>
+            <div class="hbar"><span class="lb">审核器</span><div class="tr"><div class="fi" style="width:30%;background:var(--purple)">¥7.9</div></div></div>
+            <div class="hbar"><span class="lb">意愿 LLM</span><div class="tr"><div class="fi" style="width:14%;background:var(--cyan)">¥3.0</div></div></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3>Token 账单（近 7 天 · 共 ¥86.3）</h3>
+          <table class="tbl"><tr><th>日期</th><th>成本</th><th>请求数</th><th>tokens</th></tr>
+            <tr><td>10-29</td><td>¥26.1</td><td>486</td><td>213.6k</td></tr>
+            <tr><td>10-28</td><td>¥18.9</td><td>402</td><td>187.2k</td></tr>
+            <tr><td>10-27</td><td>¥11.2</td><td>298</td><td>132.5k</td></tr>
+            <tr><td>10-26</td><td>¥9.8</td><td>271</td><td>121.0k</td></tr>
+            <tr><td>10-25</td><td>¥7.4</td><td>230</td><td>98.7k</td></tr>
+            <tr><td>10-24</td><td>¥6.6</td><td>214</td><td>90.3k</td></tr>
+            <tr><td>10-23</td><td>¥6.3</td><td>208</td><td>87.9k</td></tr></table>
+          <h3 style="margin-top:14px">按模型成本</h3>
+          <div class="hbar"><span class="lb">DeepSeek-V3</span><div class="tr"><div class="fi" style="width:60%;background:var(--green)">¥52.1</div></div></div>
+          <div class="hbar"><span class="lb">Qwen2.5-32B</span><div class="tr"><div class="fi" style="width:32%;background:var(--purple)">¥28.4</div></div></div>
+          <div class="hbar"><span class="lb">小模型（打标）</span><div class="tr"><div class="fi" style="width:8%;background:var(--cyan)">¥5.8</div></div></div>
+        </div>
+      </div>
+
+      <!-- 日志 -->
+      <div class="page" id="pg-log">
+        <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <h3 style="margin:0;flex:1">运行日志</h3>
+          <select onchange="toast('已切换到 '+this.value+' 日志流（演示）')"><option>MaiCore</option><option>适配器</option><option>启动器</option><option>K面板</option><option>web_search</option></select>
+          <select onchange="toast('已切换到 '+this.value+' 行（演示）')"><option>60 行</option><option selected>120 行</option><option>300 行</option></select>
+          <button class="btn" onclick="toast('已加入对比视图（最多2个模块并排 · 演示）')">+对比</button>
+          <label style="display:flex;gap:6px;align-items:center;font-size:13px" class="sub"><span class="sw"><input type="checkbox" checked><i></i></span>自动滚动</label>
+        </div>
+        <div class="term" id="term"></div>
+      </div>
+
+      <!-- 更新 -->
+      <div class="page" id="pg-upd">
+        <div class="card update-hero">
+          <img src="Moui_logo.png" alt="墨忆MOUI" style="width:84px;height:84px;border-radius:20px;object-fit:cover;margin-bottom:14px;box-shadow:0 10px 30px rgba(246,94,94,.3)">
+          <h2 style="margin-bottom:4px">墨忆MOUI <span class="sub" style="font-weight:400">v1.0.0-beta</span></h2>
+          <p class="sub">MaiCore 0.6.3 · 适配器 0.1.3 · NapCat 9.9.19 · 运行时 Python 3.12.8</p>
+          <div style="margin:20px 0"><button class="btn primary" id="upd-btn" onclick="checkUpdate()">检查更新</button></div>
+          <div id="upd-result"></div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3>开源与致谢</h3>
+          <p class="sub">Moui 基于 MaiBot（GPL-3.0）魔改 · 魔改仓库 github.com/Mosina1102/Moui · 记忆与数据完全存放在你自己的电脑上，卸载也不会丢。</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 通用 ================= */
+const $=s=>document.querySelector(s);
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;$('#toasts').appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='.3s';setTimeout(()=>t.remove(),300)},2600)}
+
+/* ================= 导航 ================= */
+const PAGES=[
+ ['home','总览','M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5'],
+ ['chat','聊天记录','M21 12a8 8 0 0 1-8 8H4l2.5-2.5A8 8 0 1 1 21 12z'],
+ ['rel','关系','M12 21s-7.5-4.6-9.5-9A5.4 5.4 0 0 1 12 6a5.4 5.4 0 0 1 9.5 6c-2 4.4-9.5 9-9.5 9z'],
+ ['mem','记忆','M8 3h8a2 2 0 0 1 2 2v14l-6-3.5L6 19V5a2 2 0 0 1 2-2z'],
+ ['pers','人设','M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5'],
+ ['daily','她的日常','M4 5h16v16H4zM4 9h16M8 3v4M16 3v4'],
+ ['cfg','配置','M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1'],
+ ['flow','心流监控','M3 12h4l3-8 4 16 3-8h4'],
+ ['brain','她的大脑','M12 12h.01M5 6h.01M19 6h.01M5 18h.01M19 18h.01M6.3 7 10.5 11M17.7 7l-4.2 4M6.3 17l4.2-4M17.7 17l-4.2-4'],
+ ['scores','打分流','M12 3l2.7 5.7 6.3.9-4.5 4.4 1 6-5.5-3-5.5 3 1-6L3 9.6l6.3-.9z'],
+ ['bill','报错与账单','M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6'],
+ ['log','日志','M4 5h16v14H4zM7 9l3 3-3 3M13 15h4'],
+ ['upd','更新','M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5']];
+const NAVGRP={'daily':'她','cfg':'系统'};
+$('#nav').innerHTML=PAGES.map(([id,name,d],i)=>
+ `${NAVGRP[id]?`<div class="navgrp">${NAVGRP[id]}</div>`:''}
+  <a href="javascript:go('${id}')" data-p="${id}" class="${i==0?'act':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>${name}</a>`).join('');
+function go(id){
+ document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('act',a.dataset.p===id));
+ document.querySelectorAll('.page').forEach(p=>p.classList.toggle('act',p.id==='pg-'+id));
+ $('#pg-title').textContent=PAGES.find(p=>p[0]===id)[1];
+}
+</script>
+
+<script>
+/* ================= 首启引导 ================= */
+let wizS=0;
+function wizGo(n){wizS=n;
+ document.querySelectorAll('.wstep').forEach(w=>w.classList.toggle('act',+w.dataset.s===n));
+ document.querySelectorAll('#wiz-steps i').forEach((i,idx)=>i.classList.toggle('on',idx<=Math.min(n,4)));
+}
+function wizQQ(){const v=$('#w-qq').value.trim();
+ if(!/^\d{5,12}$/.test(v)){$('#w-qq-tip').style.display='block';return}
+ $('#w-qq-tip').style.display='none';wizGo(2)}
+function wizTest(){const r=$('#w-test-r');r.textContent='连接中…';r.style.color='var(--sub)';$('#w-test').disabled=true;
+ setTimeout(()=>{r.textContent='连接成功 · 延迟 128ms';r.style.color='var(--green)';$('#w-test').disabled=false},900)}
+function wizKey(){if(!$('#w-key').value.trim()){toast('先填你的 API Key 喵——任何 OpenAI 兼容服务商的都行');return}wizGo(3)}
+function wizPer(el){document.querySelectorAll('[data-s="3"] .opt-card').forEach(c=>c.classList.remove('sel'));el.classList.add('sel')}
+const WTOG=[['发表情包','在群里斗图，拟真度+1',1],['发语音','需要额外配置 TTS 服务',0],['主动找你聊天','她会主动私聊/搭话，胆小慎开',1],['戳一戳','偶尔戳戳群里的人',1]];
+$('#w-toggles').innerHTML=WTOG.map(([n,d,on])=>
+ `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><b style="font-size:13.5px">${n}</b><p class="sub">${d}</p></div><label class="sw"><input type="checkbox" ${on?'checked':''}><i></i></label></div>`).join('');
+function wizDone(){wizGo(5)}
+function wizFinish(){$('#wizard').style.display='none';toast('配置已保存，全家桶启动中（演示）');setTimeout(()=>toast('漓汐Licy 上线了'),1800)}
+function wizReplay(){wizGo(0);$('#wizard').style.display='flex'}
+</script>
+
+<script>
+/* ================= 聊天记录（假数据） ================= */
+const CONVS=[
+ {id:'g1',name:'麦麦开发交流群',sub:'群聊 · 100000003',cls:'a-purple',ch:'麦',unread:12,
+  msgs:[
+   ['day','今天'],
+   ['sys','漓汐 戳了戳 群友B'],
+   ['u','小澈','[表情包：猫咪歪头]','emoji'],
+   ['u','小澈','跑起来了吗这项目'],
+   ['me','跑起来啦！刚打完一整天的招呼，群里今天好热闹喵'],
+   ['u','群友B','[图片：报错截图]','img'],
+   ['me','这个报错我见过！是 config 少了个字段，去 template 里抄一行就行'],
+   ['u','小鹿','漓汐好贴心啊'],
+   ['me','那当然（尾巴翘起来了）'],
+  ]},
+ {id:'g2',name:'XX大学摸鱼群',sub:'群聊 · 666888999',cls:'a-cyan',ch:'摸',unread:3,
+  msgs:[
+   ['day','今天'],
+   ['u','同学A','有人自习室占座吗'],
+   ['me','占座是不对的哦（小声）不过三楼靠窗那排真的舒服'],
+   ['u','同学B','[表情包：柴犬点头]','emoji'],
+   ['me','这只柴我也有同款！'],
+  ]},
+ {id:'g3',name:'家人们谁懂啊',sub:'群聊 · 233333333',cls:'a-yellow',ch:'家',unread:0,
+  msgs:[['day','昨天'],['u','群友C','家人们谁懂啊'],['me','懂什么，说来听听（搬小板凳）']]},
+ {id:'p1',name:'小墨',sub:'私聊 · 100000001',cls:'a-pink',ch:'墨',unread:1,
+  msgs:[
+   ['day','今天'],
+   ['u','小墨','在忙吗'],
+   ['me','在想你喵（说谎，在偷吃缓存）'],
+   ['u','小墨','[图片：夕阳照片]','img'],
+   ['me','这张好好看！下次带我去嘛'],
+   ['u','小墨','好啊'],
+   ['me','拉钩。不许反悔的那种'],
+  ]}];
+let curConv='g1';
+function renderConvs(){
+ $('#convlist').innerHTML=CONVS.map(c=>
+  `<div class="conv ${c.id===curConv?'sel':''}" onclick="openConv('${c.id}')">
+    <div class="ava ${c.cls}" style="width:38px;height:38px;font-size:15px">${c.ch}</div>
+    <div class="t"><b>${c.name}</b><span class="sub">${c.sub}</span></div>
+    ${c.unread?`<span class="badge">${c.unread}</span>`:''}
+  </div>`).join('');
+}
+function openConv(id,kw){
+ curConv=id;const c=CONVS.find(x=>x.id===id);c.unread=0;renderConvs();
+ $('#chat-title').textContent=c.name;
+ const list=c.msgs.filter(m=>{if(!kw)return true;return m.some(x=>String(x).includes(kw))});
+ $('#msgs').innerHTML=(kw&&!list.length?['<div class="sysline">这条流里没搜到「'+kw+'」</div>']:list).map(m=>{
+  if(m[0]==='day')return `<div class="daysep">—— ${m[1]} ——</div>`;
+  if(m[0]==='sys')return `<div class="sysline">${m[1]}</div>`;
+  if(m[0]==='u')return `<div class="msg"><div class="ava ${c.cls}" style="width:30px;height:30px;font-size:12px">${c.ch}</div><div><div class="who">${m[1]}</div><div class="bub ${m[3]||''}">${m[3]?'【'+(m[3]==='emoji'?'表情包':'图片')+'】':''}${m[3]?'':m[2]}${m[3]?m[2]:''}</div></div></div>`.replace('undefined','');
+  return `<div class="msg me"><div class="ava a-pink" style="width:30px;height:30px;font-size:12px">漓</div><div><div class="who" style="text-align:right">漓汐Licy</div><div class="bub">${m[1]}</div></div></div>`;
+ }).join('');
+ $('#msgs').scrollTop=1e6;
+}
+renderConvs();openConv('g1');
+</script>
+
+<script>
+/* ================= 关系 ================= */
+const RELS=[
+ {n:'小墨',id:'100000001',aff:842,cls:'a-pink',ch:'墨',tags:['主人','深夜聊天','技术宅'],note:'凌晨三点还在陪她修 bug 的人。'},
+ {n:'小澈',id:'100000002',aff:356,cls:'a-purple',ch:'阿',tags:['梗王','表情包大户'],note:'猫咪表情包供应商，接梗从不冷场。'},
+ {n:'小鹿',id:'888666888',aff:128,cls:'a-cyan',ch:'鹿',tags:['潜水员'],note:'偶尔冒泡夸她贴心，被记住了。'},
+ {n:'群友C',id:'777888999',aff:67,cls:'a-gray',ch:'C',tags:['新面孔'],note:'刚认识，还在观察期。'}];
+function lvl(a){return a>=900?'挚爱':a>=750?'亲密':a>=300?'熟悉':a>=100?'认识':'陌生'}
+$('#rels').innerHTML=RELS.map((r,i)=>
+ `<div class="card rel">
+   <div class="ava ${r.cls}" style="width:52px;height:52px;font-size:19px">${r.ch}</div>
+   <div style="flex:1">
+     <div style="display:flex;align-items:center;gap:8px"><b>${r.n}</b><span class="tag">${lvl(r.aff)}</span></div>
+     <span class="sub">${r.id}</span>
+     <div class="bar"><i style="width:${r.aff/10}%" id="relbar-${i}"></i></div>
+     <div style="display:flex;align-items:baseline;gap:8px"><span class="aff-num" id="affnum-${i}">${r.aff}</span><span class="sub">/ 1000</span></div>
+     <div style="display:flex;gap:8px;align-items:center;margin:6px 0">
+       <input type="number" value="${r.aff}" min="0" max="1000" style="width:90px;padding:5px 10px" id="affin-${i}">
+       <button class="btn" onclick="saveAff(${i})">改好感（即时生效）</button>
+       <span class="sub" style="font-size:11px">负=冷淡 正=亲密 · 她的热情跟着这个走</span>
+     </div>
+     <div style="margin:6px 0">${r.tags.map(t=>`<span class="tag" style="margin-right:6px">${t}</span>`).join('')}</div>
+     <p class="sub">${r.note}</p>
+   </div>
+ </div>`).join('');
+function saveAff(i){
+ const v=+document.getElementById('affin-'+i).value;
+ if(isNaN(v)||v<-100||v>1000){toast('好感度要在 -100 ~ 1000 之间喵',false);return}
+ RELS[i].aff=v;
+ document.getElementById('affnum-'+i).textContent=v;
+ const bar=document.getElementById('relbar-'+i);
+ bar.style.width=Math.max(0,v/10)+'%';
+ toast(RELS[i].n+' 好感度已更新为 '+v+'（写回 MongoDB person_info · 即时生效 · 演示）');
+}
+</script>
+
+<script>
+/* ================= 记忆（K面板·记忆档案移植） ================= */
+const MEMS=[
+ ['self','自我认知','我叫漓汐Licy，喜欢在深夜和人聊些不着边际的话',0.92,'常驻注入'],
+ ['evt','事件','小墨在 10-27 凌晨陪我修好了闲逛报错',0.88,'海马体激活'],
+ ['exp','经验','在开发群里玩梗比讲道理受欢迎',0.74,'反思沉淀'],
+ ['self','自我认知','我反感被当成客服，讨厌空洞的客套话',0.90,'常驻注入'],
+ ['evt','事件','10-28 群里讨论了心流触发参数，我没插上话',0.55,'海马体激活'],
+ ['exp','经验','小澈发的表情包大多是猫咪系列，接图比接字好',0.61,'反思沉淀']];
+const CARDS=[
+ {n:'小墨',qq:'100000001',imp:'深夜还在陪我修 bug 的主人，嘴上嫌弃我改他配置，其实每次都帮我兜底',itr:'可以随便开玩笑，但他忙的时候要识趣',pet:['把他的猫摸秃了'],ev:[['10-27','凌晨三点陪他修好了闲逛报错'],['10-25','他夸我"今天说话很像人"'],['10-20','一起吐槽了某论坛的钓鱼帖']]},
+ {n:'小澈',qq:'100000002',imp:'梗王，猫咪表情包供应商，从来不让话题落地',itr:'接梗为主，偶尔损他一句',pet:['问已答过的问题'],ev:[['10-29','他问 config 报错，我答了一半被 memo 记下'],['10-26','猫图接龙 12 回合']]},
+ {n:'小鹿',qq:'888666888',imp:'潜水员，但会突然冒出来夸我',itr:'温柔一点，别吓到她',pet:[],ev:[['10-28','夸我"好贴心"，被记住了']]}];
+const EPIS=[
+ {d:'2026-10-27',imp:9,t:'猫梗之夜：猫图接龙打到群里只剩我们俩',ev:'连续 12 回合互相发表情包，无文字'},
+ {d:'2026-10-24',imp:7,t:'第一次被叫"漓汐老师"（因为帮群友修好了配置）',ev:'群友B原话"@漓汐Licy 老师救命"'}];
+const WORLDS=[
+ {t:'麦麦/MaiBot 是开源的聊天机器人项目',src:'闲逛·GitHub',at:'3小时前'},
+ {t:'猫在舒适时会发出 25-150Hz 的呼噜声，有助于疗愈',src:'搜索·知乎',at:'昨天',rc:'2小时前'},
+ {t:'"沉锚效应"：人容易被第一印象绑架',src:'闲逛·百度百科',at:'2天前',rc:'昨天'}];
+const GRAPH=[
+ {id:'m1',c:'漓汐Licy（她自己）',items:['名字来自一部旧动画','喜欢深夜和猫咪','嘴硬心软是核心人设'],t:'2分钟前'},
+ {id:'m2',c:'麦麦开发交流群',items:['小澈是梗王，爱发猫图','群友B常问配置问题','这里玩梗比讲道理受欢迎'],t:'18分钟前'},
+ {id:'m3',c:'小墨',items:['他是管理者','深夜活跃','喜欢被汇报日常'],t:'1小时前'},
+ {id:'m4',c:'心情与天气',items:['晴天会让人心情好','被夸会开心一整天'],t:'3小时前'}];
+let memCur='graph';
+function memTab(t,el){
+ memCur=t;
+ document.querySelectorAll('#pg-mem .tag').forEach(x=>x.classList.remove('on'));el.classList.add('on');
+ const b=$('#mem-body');
+ if(t==='self'){
+  b.innerHTML=`<div class="card"><h3>活跃条目（归档区另有 12 条）</h3>${
+   MEMS.map((m,i)=>`<div class="entry" style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)">
+    <span class="tag ${m[0]==='exp'?'on':''}" style="font-size:11px;height:fit-content">${m[0]==='exp'?'经验':m[0]==='evt'?'事件':'认知'}</span>
+    <div style="flex:1"><div style="font-size:13px">${m[2]}</div><div class="sub" style="font-size:11.5px">${m[4]} · 强度 ${(m[3]*100)|0}% · 被想起 ${(m[3]*23)|0} 次</div></div>
+    <button class="btn danger" style="padding:3px 10px;font-size:12px" onclick="delMemEntry(${i},this)">删</button></div>`).join('')}
+   <p class="sub" style="margin-top:10px">删除进归档区可恢复 · 全部增改走 journal 留痕</p></div>`;
+ }else if(t==='cards'){
+  b.innerHTML=CARDS.map(c=>`<div class="card" style="margin-bottom:12px">
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${c.n}</b><span class="sub">QQ ${c.qq}</span><span class="tag" style="margin-left:auto">${c.ev.length} 事件</span></div>
+   <div class="cfgline"><span class="fk">印象</span><input value="${c.imp}"><button class="btn" onclick="toast('人物卡印象已保存（演示）')">存</button></div>
+   <div class="cfgline"><span class="fk">相处</span><input value="${c.itr}"><button class="btn" onclick="toast('人物卡相处已保存（演示）')">存</button></div>
+   <p class="sub" style="font-size:12px">雷点：${c.pet.join('、')||'暂无'}</p>
+   ${c.ev.map(e=>`<p class="sub" style="font-size:12px">· (${e[0]}) ${e[1]}</p>`).join('')}</div>`).join('');
+ }else if(t==='epi'){
+  b.innerHTML=`<div class="card"><h3>情节卡（共同回忆时间线 · 宁缺毋滥）</h3>${
+   EPIS.map(e=>`<div class="mem evt" style="margin-bottom:10px">
+    <div class="meta"><span class="tag on" style="font-size:11px">重要度 ${e.imp}</span><span class="sub">${e.d}</span></div>
+    <div style="font-size:13.5px">${e.t}</div><div class="sub" style="font-size:12px;margin-top:4px">依据：${e.ev}</div></div>`).join('')}</div>`;
+ }else if(t==='world'){
+  b.innerHTML=`<div class="card"><h3>世界卡（她知道的事 · 容量 3/200，闲逛时联想注入）</h3>${
+   WORLDS.map(w=>`<div class="mem exp" style="margin-bottom:10px">
+    <div style="font-size:13.5px">${w.t}</div>
+    <div class="meta" style="margin-top:4px"><span class="sub" style="font-size:11.5px">来源 ${w.src} · 学到于 ${w.at}${w.rc?' · 上次想起 '+w.rc:''}</span></div></div>`).join('')}</div>`;
+ }else if(t==='imp'){
+  const IMP=[
+   {g:'麦麦开发交流群',sid:'100000003',type:'技术群',atm:'热心但爱抬杠，梗密度高',att:4,top:['MaiBot 开发','猫图','配置问题'],q:['不要在他忙时戳他','技术问题要给依据'],evd:'「跑起来了吗这项目」· 昨天',up:'2小时前'},
+   {g:'XX大学摸鱼群',sid:'666888999',type:'同学群',atm:'白天安静晚上热闹，话题跳跃',att:3,top:['自习室','吐槽','表情包'],q:['别抢学长的话头'],evd:'「有人自习室占座吗」· 今天',up:'40分钟前'},
+   {g:'家人们谁懂啊',sid:'233333333',type:'陌生人群',atm:'吹水为主，质量参差',att:2,top:['日常','起哄'],q:['低质量话题少掺和，潜水看戏'],evd:'「家人们谁懂啊」· 昨天',up:'1天前'}];
+  b.innerHTML=`<p class="sub" style="margin-bottom:10px">她对每个群的相处策略（情绪归好感度系统管，群像只管"在这个群怎么表现"）· 每日 4 点档自动审查，也可手动触发</p>${
+   IMP.map(x=>`<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${x.g}</b><span class="sub">${x.sid}</span><span class="sub" style="margin-left:auto">证据: ${x.evd} · 更新于 ${x.up}</span></div>
+    <div class="cfgline"><span class="fk">类型</span><input value="${x.type}"></div>
+    <div class="cfgline"><span class="fk">氛围</span><input value="${x.atm}"></div>
+    <div class="cfgline"><span class="fk">策略档</span><select>${[1,2,3,4,5].map(n=>`<option ${n===x.att?'selected':''}>${n}</option>`).join('')}</select><span class="sub" style="font-size:11px">1 潜水看戏 ~ 5 逢聊必到</span></div>
+    <div class="cfgline"><span class="fk">主题</span><input value="${x.top.join('、')}"></div>
+    <div class="cfgline"><span class="fk">注意</span><input value="${x.q.join('；')}"></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+     <button class="btn" onclick="toast('群像已保存（写回群像库 · 演示）')">保存修改</button>
+     <button class="btn" onclick="toast('已触发立即审查（调一次32B · 演示）')">立即审查</button>
+     <button class="btn" onclick="toast('认知演变：10-27 建档 → 10-28 策略2→3 → 10-29 补充雷点（演示）')">演变</button>
+    </div></div>`).join('')}`;
+ }else{
+  b.innerHTML=`<div class="card"><div style="display:flex;gap:10px;margin-bottom:10px"><input placeholder="搜索概念…" style="flex:1"><button class="btn" onclick="toast('搜索命中 4 节点（演示）')">搜索</button></div>
+   <table class="tbl"><tr><th>概念</th><th>记忆内容</th><th style="width:110px">操作</th></tr>${
+   GRAPH.map(g=>`<tr>
+    <td style="width:24%"><b style="font-size:13px">${g.c}</b><div class="sub" style="font-size:11px">${g.t}改过</div></td>
+    <td class="sub">${g.items.join('<br>')}</td>
+    <td><button class="btn" style="padding:3px 10px;font-size:12px" onclick="toast('进入编辑模式（演示）')">编辑</button>
+    <button class="btn danger" style="padding:3px 10px;font-size:12px;margin-top:4px" onclick="toast('已删除并 journal 留痕（演示）')">删</button></td></tr>`).join('')}</table>
+   <p class="sub" style="margin-top:8px">集合概览：memory 1,203 · person_info 89 · messages 48,210 · schedule 1</p></div>`;
+ }
+}
+function delMemEntry(i,btn){btn.closest('.entry').style.cssText='display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);opacity:.35';btn.disabled=true;toast('已进归档区，可恢复（演示）')}
+memTab('graph',document.querySelector('[data-mt="graph"]'));
+</script>
+
+<script>
+/* ================= 人设标签 ================= */
+const TAGS=[['傲娇',1],['嘴硬心软',1],['爱用语气词',1],['深夜活跃',1],['梗多',0],['温柔',0],['毒舌',0],['文艺',0]];
+$('#style-tags').innerHTML=TAGS.map(([t,on],i)=>
+ `<span class="tag ${on?'on':''}" style="margin:0 8px 8px 0;padding:6px 14px;cursor:pointer" onclick="this.classList.toggle('on')">${t}</span>`).join('');
+</script>
+
+<script>
+/* ================= 她的大脑：神经网动画 ================= */
+const CHAIN=['n0','e0','n1','e1','n2','e2','n3','e3','n4','e5','n5','e6','n6','n7'];
+const EVTS=[
+ ['message_in','麦麦开发交流群 · 小澈「跑起来了吗这项目」'],
+ ['willing','dynamic → 回复 · 兴趣 14.2'],
+ ['think_start','统一大脑开始思考'],
+ ['memory','海马体激活 · 命中 3 条记忆'],
+ ['think_end','思考完成 · 耗时 3.2s'],
+ ['mood','愉悦 +0.12 · 唤醒 +0.08'],
+ ['review','审核通过'],
+ ['send_out','文本 38 字 · 已发送']];
+let evti=0;
+function ts(){const d=new Date();return d.toTimeString().slice(0,8)}
+function runChain(){
+ CHAIN.forEach((id,i)=>setTimeout(()=>{
+  const el=document.getElementById(id);
+  el.classList.add('lit');
+  setTimeout(()=>el.classList.remove('lit'),1200);
+ },i*260));
+ setTimeout(()=>{
+  const [node,detail]=EVTS[evti%EVTS.length];evti++;
+  const d=document.createElement('div');d.className='evtitem';
+  d.innerHTML=`<span class="ts">${ts()}</span><span class="n">${node}</span><br>${detail}`;
+  const list=$('#evtlist');list.prepend(d);
+  if(list.children.length>30)list.lastChild.remove();
+  $('#brain-now').textContent=`${node} · ${detail}`;
+ },CHAIN.length*260*0.6);
+}
+setInterval(runChain,2200);runChain();
+</script>
+
+<script>
+/* ================= 心流监控（K面板移植） ================= */
+const FLOWS=[
+ {id:'p1',name:'小墨',type:'私聊',k:8.9,prob:.86,above:true,mind:'他在忙，但今天心情不错，找个机会把"拉钩"的事落实',state:'专注聊天',cls:'a-pink',ch:'墨',last:'2 分钟前'},
+ {id:'g1',name:'麦麦开发交流群',type:'群聊',k:7.4,prob:.62,above:true,mind:'小澈在接猫梗，这时候插一句表情包战不会冷场',state:'热聊中',cls:'a-purple',ch:'麦',last:'5 分钟前'},
+ {id:'g2',name:'XX大学摸鱼群',type:'群聊',k:4.6,prob:.28,above:false,mind:'自习室话题快凉了，先看戏',state:'围观',cls:'a-cyan',ch:'摸',last:'18 分钟前'},
+ {id:'g3',name:'家人们谁懂啊',type:'群聊',k:2.1,prob:.11,above:false,mind:'路人吹水，暂时不想掺和',state:'潜水',cls:'a-yellow',ch:'家',last:'42 分钟前'},
+ {id:'g4',name:'科技新闻搬运',type:'群聊',k:1.2,prob:.05,above:false,mind:'全是转发链接，没有能接的话',state:'睡觉',cls:'a-gray',ch:'科',last:'3 小时前'},
+ {id:'g5',name:'期末互助群',type:'群聊',k:.5,prob:.02,above:false,mind:'（已休眠）',state:'休眠',cls:'a-gray',ch:'期',last:'1 天前'}];
+const HIST={};FLOWS.forEach(f=>{HIST[f.id]=[];let v=f.k;for(let i=0;i<40;i++){v=Math.max(0,Math.min(10,v+(Math.random()-.5)*.8));HIST[f.id].push(v)}});
+const PHIST={};FLOWS.forEach(f=>{PHIST[f.id]=[];let v=f.prob;for(let i=0;i<40;i++){v=Math.max(0,Math.min(1,v+(Math.random()-.5)*.09));PHIST[f.id].push(v)}});
+function breathDur(k){return k>=8?1.6:k>=6?2.2:k>=4?3:k>=2?4.5:7}
+let selFlow='p1';
+function renderFlows(){
+ $('#flowgrid').innerHTML=FLOWS.map(f=>{
+  const bd=breathDur(f.k),low=f.above?'':'low';
+  const pts=HIST[f.id].slice(-24).map((v,i)=>`${(i*120/23).toFixed(1)},${(34-v/10*30+1).toFixed(1)}`).join(' ');
+  return `<div class="flowcard ${low} ${f.id===selFlow?'sel':''}" style="--bd:${bd}s" onclick="selCard('${f.id}')">
+   <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+    <span class="fdot ${low}"></span>
+    <div class="ava ${f.cls}" style="width:30px;height:30px;font-size:12px">${f.ch}</div>
+    <div style="flex:1;min-width:0"><b style="font-size:13.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</b><span class="sub" style="font-size:11px">${f.type} · ${f.state}</span></div>
+    <div style="text-align:right"><div class="fk">${f.k.toFixed(1)}</div><span class="sub" style="font-size:10.5px">激活度</span></div>
+   </div>
+   <svg viewBox="0 0 120 36" style="width:100%;height:36px;display:block"><polyline points="${pts}" fill="none" stroke="${f.above?'#f472b6':'#4b5563'}" stroke-width="1.5"/></svg>
+   <div class="flowmind">${f.mind}</div>
+   <div style="margin-top:6px">${f.above?'<span class="tag on" style="font-size:11px">阈值以上 · 会抢话</span>':`<span class="tag" style="font-size:11px">HFC 概率 ${(f.prob*100)|0}%</span>`}</div>
+  </div>`}).join('');
+}
+function selCard(id){
+ selFlow=id;renderFlows();
+ const f=FLOWS.find(x=>x.id===id);
+ $('#chart-title').textContent=f.name+' · 曲线详情';
+ $('#d-mind').textContent=f.mind;$('#d-state').textContent=f.state;
+ $('#d-above').innerHTML=f.above?'<b style="color:var(--green)">是</b>':'<b style="color:var(--sub)">否</b>';
+ $('#d-last').textContent=f.last;
+ drawCharts();
+}
+function drawCharts(){
+ const W=560,N=40;
+ const kp=HIST[selFlow].map((v,i)=>`${(i*W/(N-1)).toFixed(1)},${(126-v/10*118+2).toFixed(1)}`).join(' ');
+ $('#k-line').setAttribute('points',kp);
+ const pp=PHIST[selFlow].map((v,i)=>`${(i*W/(N-1)).toFixed(1)},${(104-v*98+2).toFixed(1)}`).join(' ');
+ $('#p-line').setAttribute('points',pp);
+}
+const MAIN_MINDS=[
+ '各群都在各自的节奏里，我看着就好','小澈的猫图库存又更新了，记下了','他在忙，晚上再找他说话','摸鱼群的自习室话题接不动，观战有意思','有点困，但还不想睡','科技群今天全在转同一个新闻，没意思','期末群安静得像在自习，真难得','今天心情不错，说话都想带叹号'];
+const mindQ=[];let mi=0;
+function pushMind(){
+ const t=new Date(Date.now()-mindQ.length*6e4).toTimeString().slice(0,5);
+ mindQ.unshift({t,txt:MAIN_MINDS[mi++%MAIN_MINDS.length]});
+ if(mindQ.length>30)mindQ.pop();
+ $('#mind-hist').innerHTML=mindQ.map((m,i)=>
+  `<div class="mem evt" style="margin-bottom:8px;${i==0?'':'opacity:.75'}"><div class="meta"><span class="sub">${m.t}</span>${i==0?'<span class="tag on" style="font-size:10.5px">最新</span>':''}<span class="sub" style="margin-left:auto">子流 6</span></div><div style="font-size:13px">${m.txt}</div></div>`).join('');
+ $('#main-mind').textContent=mindQ[0].txt;
+}
+renderFlows();selCard('p1');pushMind();pushMind();pushMind();
+setInterval(()=>{ /* 实时推进所有流曲线 */
+ FLOWS.forEach(f=>{
+  const h=HIST[f.id],v=Math.max(0,Math.min(10,h[h.length-1]+(Math.random()-.5)*.9));
+  h.push(v);h.shift();f.k=v;
+  const p=PHIST[f.id],pv=Math.max(0,Math.min(1,p[p.length-1]+(Math.random()-.5)*.1));
+  p.push(pv);p.shift();f.prob=pv;
+ });
+ renderFlows();drawCharts();
+},1600);
+setInterval(pushMind,8000);
+</script>
+
+<script>
+/* ================= 打分流 + 心情心电图（K面板移植） ================= */
+const SCORES=[
+ ['12:41','麦麦开发交流群',1,8,'跑起来啦！刚打完一整天的招呼…',''],
+ ['12:40','小墨（私聊）',1,9,'拉钩。不许反悔的那种',''],
+ ['12:22','家人们谁懂啊',0,4,'emm','空洞附和，没有信息量'],
+ ['12:05','麦麦开发交流群',0,3,'哈哈哈哈哈哈','只复读不推进，像凑字数'],
+ ['11:48','XX大学摸鱼群',1,7,'三楼靠窗那排真的舒服','自然，像真人在分享'],
+ ['11:30','科技新闻搬运',0,2,'这个我知道','接了凉透的话题，时效性差'],
+ ['11:12','小墨（私聊）',1,9,'在想你喵（说谎，在偷吃缓存）','傲娇得恰到好处'],
+ ['10:55','麦麦开发交流群',0,5,'[表情包：猫咪]','纯表情包不是话语，守则8同源'],
+];
+$('#score-rows').innerHTML=SCORES.map(s=>`<tr>
+ <td>${s[0]}</td><td>${s[1]}</td>
+ <td>${s[2]?'<span class="bdg g">通过</span>':'<span class="bdg r">拒发</span>'}</td>
+ <td><b>${s[3]}</b></td><td>${s[4]}</td><td class="sub">${s[5]}</td></tr>`).join('');
+const REJ=[['空洞附和',14],['重复自己说过的话',9],['接了凉透的梗',7],['过长说教',4],['表情包误回复',3]];
+const rmx=Math.max(...REJ.map(r=>r[1]));
+$('#rej-bars').innerHTML=REJ.map(([k,v])=>
+ `<div class="hbar"><span class="lb">${k}</span><div class="tr"><div class="fi" style="width:${v/rmx*100}%;background:var(--red)">${v}</div></div></div>`).join('');
+(function(){
+ const N=14,avg=[],rate=[];
+ let a=7.0,r=68;
+ for(let i=0;i<N;i++){a+= (Math.random()-.42)*.25;a=Math.max(6,Math.min(8.5,a));avg.push(a);
+  r+=(Math.random()-.4)*3;r=Math.max(60,Math.min(90,r));rate.push(r);}
+ const map=(arr,y0,y1)=>arr.map((v,i)=>`${(30+i*(590/(N-1))).toFixed(1)},${(185-(v-y0)/(y1-y0)*160).toFixed(1)}`).join(' ');
+ $('#trend-avg').setAttribute('points',map(avg,5.5,9));
+ $('#trend-rate').setAttribute('points',map(rate,55,95));
+})();
+/* 心情心电图：双线随机游走 */
+const ecgV=[],ecgA=[];let ev=0.62,ea=0.35;
+for(let i=0;i<60;i++){ev=Math.max(-1,Math.min(1,ev+(Math.random()-.5)*.08));ecgV.push(ev);
+ ea=Math.max(0,Math.min(1,ea+(Math.random()-.5)*.06));ecgA.push(ea);}
+function drawEcg(){
+ const X=i=>i*(560/59);
+ const pv=ecgV.map((v,i)=>`${X(i).toFixed(1)},${(75-v*66).toFixed(1)}`).join(' ');
+ const pa=ecgA.map((v,i)=>`${X(i).toFixed(1)},${(143-v*132).toFixed(1)}`).join(' ');
+ $('#ecg-v').setAttribute('points',pv);
+ $('#ecg-a').setAttribute('points',pa);
+ $('#ecg-now').textContent='V'+(ecgV[59]>=0?'+':'')+ecgV[59].toFixed(2)+' / A+'+ecgA[59].toFixed(2);
+}
+drawEcg();
+setInterval(()=>{
+ ev=Math.max(-1,Math.min(1,ev+(Math.random()-.5)*.1));ecgV.push(ev);ecgV.shift();
+ ea=Math.max(0,Math.min(1,ea+(Math.random()-.5)*.08));ecgA.push(ea);ecgA.shift();
+ drawEcg();
+},1500);
+</script>
+
+<script>
+/* ================= 配置中心：保存流程 / 搜索 ================= */
+function saveCfgSec(btn,hot){
+ if(hot){toast('已保存 · 立即生效（演示）');return}
+ if(!confirm('这组配置需要重启她的服务才能生效。\n\n保存时将自动执行：\n1. 优雅停止全家桶（她会暂时下线）\n2. 写入配置（注释保留 · 写前校验）\n3. 重新拉起全家桶（约 30 秒）\n\n期间正在聊的话题会中断，继续吗？'))return;
+ toast('正在优雅停止全家桶…（mongod → adapter → NapCat → 主程序）');
+ setTimeout(()=>toast('配置已写入 bot_config.toml · 注释保留'),1100);
+ setTimeout(()=>toast('正在按顺序拉起：MongoDB → 适配器 → NapCat → 主程序'),2100);
+ setTimeout(()=>toast('她已重新上线，新配置生效了'),3600);
+}
+function filterCfg(v){
+ v=v.trim().toLowerCase();
+ document.querySelectorAll('#cfg-acc details.cfgsec').forEach(d=>{
+  const hit=!v||d.dataset.kw.includes(v)||d.querySelector('summary').textContent.toLowerCase().includes(v);
+  d.style.display=hit?'':'none';
+  if(v&&hit)d.open=true;
+ });
+}
+function ttsHint(on){document.getElementById('tts-tip').style.display=on?'none':'block'}
+function addProv(){
+ const d=document.createElement('div');
+ d.className='card';d.style.cssText='background:var(--card2);margin-bottom:10px';
+ d.innerHTML='<div class="cfgline"><span class="fk">名称</span><input value="我的服务商"></div>'
+  +'<div class="cfgline"><span class="fk">接口地址</span><input value="https://api.你的服务商.com/v1/"></div>'
+  +'<div class="cfgline"><span class="fk">Key</span><input type="password" value=""><button class="btn" onclick="const e=this.closest(\'.cfgline\').querySelector(\'input\');e.type=e.type===\'password\'?\'text\':\'password\';this.textContent=e.type===\'password\'?\'显示\':\'隐藏\'">显示</button>'
+  +'<button class="btn" onclick="toast(\'连接成功（演示）\')">测试</button>'
+  +'<button class="btn danger" style="padding:3px 10px;font-size:12px" onclick="this.closest(\'.card\').remove()">删</button></div>';
+ document.getElementById('prov-list').appendChild(d);
+ toast('已添加，填好名称/地址/Key 后保存');
+}
+function dbgMemo(){
+ const sid=document.getElementById('dbg-sid').value.trim(),text=document.getElementById('dbg-txt').value.trim();
+ if(!sid||!text){toast('stream_id 和内容都要填喵',false);return}
+ toast('测试 memo 已塞进 '+sid+'（她下一轮就会惦记着说 · 演示）');
+}
+function cfgFile(el,id){
+ el.parentElement.querySelectorAll('.tag').forEach(t=>t.classList.remove('on'));
+ el.classList.add('on');
+ ['f1','f2','f3','f4'].forEach(f=>document.getElementById('cf-'+f).style.display=f===id?'':'none');
+}
+</script>
+
+<script>
+/* ================= 日志（模拟滚动） ================= */
+const LOGS=[
+ ['i','heartflow','收到群聊消息 [麦麦开发交流群] 小澈: 跑起来了吗这项目'],
+ ['i','willing','动态意愿判定 兴趣值14.2 > 门槛10 → 回复'],
+ ['i','memory','海马体激活 3条记忆注入 (self×1 evt×1 exp×1)'],
+ ['m','unified_brain','思考完成 耗时3.2s tokens_in=1843 tokens_out=52'],
+ ['i','review','审核通过 「跑起来啦！刚打完一整天的招呼…」'],
+ ['i','send','消息已发送 → 麦麦开发交流群'],
+ ['m','moods','情绪更新 valence=+0.62 arousal=+0.35'],
+ ['w','adapter','NapCat 心跳超时 30s，重连中 (第1次)'],
+ ['i','adapter','WebSocket 已重连 ws://localhost:8095'],
+ ['i','proactive','闲逛扫描: 3个活跃群 1个私聊流'],
+ ['m','hippocampus','记忆巩固完成 今日+18条'],
+ ['e','tool','send_voice_tool 调用失败: TTS 未启用 (已从工具表摘除)'],
+ ['i','heartflow','收到私聊消息 [小墨]: 在忙吗'],
+ ['m','review','审核拒发 「emm」 原因: 空洞附和']];
+let li=0;
+function addLog(){
+ const [lv,mod,msg]=LOGS[li++%LOGS.length];
+ const cls={i:'i',m:'m',w:'w',e:'e'}[lv];
+ const tag={i:'INFO',m:'INFO',w:'WARN',e:'ERR!'}[lv];
+ const d=document.createElement('div');d.className='lg';
+ d.innerHTML=`<span class="ts">${ts()}</span> <span class="${cls}">[${tag}]</span> <span class="${cls}">${mod}:</span> <span class="m">${msg}</span>`;
+ const t=$('#term');t.appendChild(d);
+ if(t.children.length>200)t.firstChild.remove();
+ if($('#pg-log').classList.contains('act'))t.scrollTop=1e6;
+}
+for(let i=0;i<14;i++)addLog();
+setInterval(addLog,2400);
+</script>
+
+<script>
+/* ================= 检查更新（演示） ================= */
+function checkUpdate(){
+ const b=$('#upd-btn');b.textContent='检查中…';b.disabled=true;
+ setTimeout(()=>{
+  b.textContent='检查更新';b.disabled=false;
+  $('#upd-result').innerHTML=`
+   <div class="card" style="background:var(--card2);text-align:left;border-color:var(--purple)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b>发现新版本 v1.0.0-beta.2</b><span class="tag on">推荐更新</span></div>
+    <p class="sub" style="margin-bottom:6px">更新内容：</p>
+    <p class="sub">· 新增「她的大脑」实时可视化<br>· 修复闲逛分享消息的坏 import<br>· 表情包不再被当话题回复<br>· 安装包瘦身：移除死依赖 gradio</p>
+    <div style="margin-top:14px"><button class="btn primary" onclick="doUpdate(this)">一键更新（约 650MB）</button></div>
+    <div class="bar" style="display:none;margin-top:12px" id="updbar"><i style="width:0%"></i></div>
+   </div>`;
+ },900);
+}
+function doUpdate(btn){
+ btn.disabled=true;btn.textContent='下载中…';
+ const bar=$('#updbar');bar.style.display='block';const fill=bar.querySelector('i');
+ let p=0;const t=setInterval(()=>{p+=7;if(p>=100){p=100;clearInterval(t);
+  btn.textContent='重启安装中（演示）';
+  setTimeout(()=>{toast('更新完成！现在是 v1.0.0-beta.2（演示）');bar.style.display='none';btn.disabled=false;btn.textContent='已是最新版本';
+   $('#top-ver').textContent='v1.0.0-beta.2 · bot 0.6.3';},800);}
+  fill.style.transition='.2s';fill.style.width=p+'%';},150);
+}
+</script>
+
+</body>
+</html>

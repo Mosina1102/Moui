@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方案K · 可塑性记忆看板</title>
+<style>
+:root{
+  --bg:#111214;--card:#1b1d21;--card2:#22252a;--line:#2e3238;
+  --text:#e6e8ea;--muted:#9aa0a8;--brand:#32f08c;--brand-dim:#1d6b45;
+  --warn:#efaa17;--danger:#e8463a;--radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:14px/1.6 "Segoe UI","PingFang SC",sans-serif;padding:16px}
+h1{font-size:18px;font-weight:600}
+.muted{color:var(--muted)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+header .sub{font-size:12px;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-size:20px;font-weight:600;color:var(--brand)}
+.tile .s{font-size:11px;color:var(--muted)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tab{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:6px 14px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--brand-dim);border-color:var(--brand);color:var(--text)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.card h3{font-size:14px;margin-bottom:8px;color:var(--brand)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500}
+.badge{display:inline-block;padding:0 8px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
+.badge.g{color:var(--brand);border-color:var(--brand-dim)}
+.badge.r{color:var(--danger);border-color:var(--danger)}
+.badge.y{color:var(--warn);border-color:var(--warn)}
+.btn{background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:4px 12px;cursor:pointer;font-size:12px}
+.btn:hover{border-color:var(--brand)}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+input,select{background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:4px 8px;font-size:13px}
+pre{background:#0c0d0f;border:1px solid var(--line);border-radius:var(--radius);padding:10px;font-size:12px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.imp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.field{display:flex;gap:6px;align-items:center;margin:4px 0}
+.field .fk{width:90px;font-size:12px;color:var(--muted);flex-shrink:0}
+.field input,.field select{flex:1}
+.entry{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line)}
+.entry .cat{flex-shrink:0;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-top:2px}
+.entry .cat.exp{color:var(--brand);border-color:var(--brand-dim)}
+.alert{background:var(--danger);color:#fff;border-radius:var(--radius);padding:8px 14px;margin-bottom:12px;font-weight:600}
+.statline{font-size:13px;color:var(--muted);margin-bottom:8px}
+.statline b{color:var(--text)}
+#toast{position:fixed;right:16px;bottom:16px;background:var(--card2);border:1px solid var(--brand);border-radius:var(--radius);padding:8px 16px;display:none;z-index:9}
+.auto{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>方案K · 可塑性记忆看板</h1><div class="sub">Moui 的记忆后台 · 数据每 10s 自动刷新 · 界面后续可扩展</div></div>
+  <div class="row">
+    <input id="token" type="password" placeholder="操作令牌（留空=只读）" style="width:200px">
+    <span class="auto" id="lastRefresh"></span>
+  </div>
+</header>
+
+<div id="alertBar"></div>
+<div class="tiles" id="tiles"></div>
+
+<div class="tabs" id="tabs">
+  <div class="tab on" data-tab="modules">板块总览</div>
+  <div class="tab" data-tab="scores">打分流</div>
+  <div class="tab" data-tab="impressions">群像</div>
+  <div class="tab" data-tab="entries">自我认知</div>
+  <div class="tab" data-tab="cards">记忆档案</div>
+  <div class="tab" data-tab="live">实时状态</div>
+  <div class="tab" data-tab="reflections">反思报告</div>
+  <div class="tab" data-tab="logs">日志流</div>
+  <div class="tab" data-tab="errors">报错&账单</div>
+  <div class="tab" data-tab="db">记忆&数据库</div>
+  <div class="tab" data-tab="config">系统配置</div>
+</div>
+<div id="content"></div>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+let curTab="scores";
+const token=()=>localStorage.getItem("k_token")||"";
+$("#token").value=token();
+$("#token").oninput=e=>localStorage.setItem("k_token",e.target.value);
+
+function toast(msg,ok=true){
+  const t=$("#toast");t.textContent=msg;t.style.borderColor=ok?"var(--brand)":"var(--danger)";
+  t.style.display="block";setTimeout(()=>t.style.display="none",2600);
+}
+async function api(path){
+  const r=await fetch(path);return await r.json();
+}
+async function post(path,params={},body=null){
+  const q=new URLSearchParams({token:token(),...params});
+  const r=await fetch(path+"?"+q,{method:"POST",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):null});
+  return await r.json();
+}
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtT=ts=>{if(!ts)return "-";const d=new Date(ts*1000);return d.toLocaleString("zh-CN",{hour12:false});};
+const ago=ts=>{if(!ts)return "-";const s=Math.floor(Date.now()/1000-ts);if(s<60)return s+"秒前";if(s<3600)return Math.floor(s/60)+"分钟前";return Math.floor(s/3600)+"小时前";};
+
+/* ---------- SVG 折线图助手 ---------- */
+function lineChart(series){
+  const W=640,H=200,P=34;
+  const all=series.flatMap(s=>s.points);
+  if(!all.length)return "<div class='muted'>暂无数据</div>";
+  const ys=all.map(p=>p.y);
+  let minY=Math.min(...ys),maxY=Math.max(...ys);
+  if(maxY-minY<0.001){minY-=1;maxY+=1;}
+  const n=Math.max(...series.map(s=>s.points.length));
+  const X=i=>P+(n<=1?W/2-P:i*(W-2*P)/(n-1));
+  const Y=v=>H-P-(v-minY)*(H-2*P)/(maxY-minY);
+  let grid="",labels="",lines="";
+  for(let i=0;i<n;i+=Math.max(1,Math.ceil(n/8))){
+    const lbl=series[0].points[i]?series[0].points[i].x:"";
+    labels+=`<text x="${X(i)}" y="${H-8}" fill="#9aa0a8" font-size="10" text-anchor="middle">${esc(lbl)}</text>`;
+  }
+  [minY,(minY+maxY)/2,maxY].forEach(v=>{
+    grid+=`<line x1="${P}" x2="${W-P}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/>`;
+    labels+=`<text x="2" y="${Y(v)+3}" fill="#9aa0a8" font-size="10">${(+v).toFixed(2)}</text>`;
+  });
+  series.forEach(s=>{
+    const pts=s.points.map((p,i)=>`${X(i)},${Y(p.y)}`).join(" ");
+    lines+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+    s.points.forEach((p,i)=>{lines+=`<circle cx="${X(i)}" cy="${Y(p.y)}" r="2.5" fill="${s.color}"/>`;});
+  });
+  const legend=series.map(s=>`<span class="badge" style="color:${s.color};border-color:${s.color}">${esc(s.name)}</span>`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${grid}${lines}${labels}</svg><div class="row" style="margin-top:4px">${legend}</div>`;
+}
+function hBars(items,color="var(--danger)"){
+  const mx=Math.max(1,...items.map(x=>x[1]));
+  return items.map(([k,v])=>`<div class="field"><span class="fk">${esc(k)}</span><div style="flex:1;background:var(--card2);border-radius:6px"><div style="width:${v/mx*100}%;background:${color};border-radius:6px;padding:0 6px;color:#111;font-size:12px;min-width:20px">${v}</div></div></div>`).join("")||'<div class="muted">暂无</div>';
+}
+
+/* ---------- 概览 ---------- */
+function tierLabel(t){return {ok:"正常",warning:"已限流（≥80%）",capped:"已熔断",unlimited:"不限"}[t]||t||"-";}
+function tierColor(t){return {ok:"var(--ok,#2e9e5b)",warning:"#d6a515",capped:"var(--danger)",unlimited:"#888"}[t]||"#888";}
+async function loadOverview(){
+  const d=await api("/api/k/overview");
+  if(!d.ok){$("#tiles").innerHTML=`<div class="tile"><div class="k">加载失败</div><div class="s">${esc(d.error||"")}</div></div>`;return;}
+  $("#alertBar").innerHTML=(d.alerts||[]).map(a=>`<div class="alert">⚠ ${esc(a)}</div>`).join("");
+  const s=d.scores_today;
+  const p=d.purpose||{},b=d.budget||{},bk=d.backups||{};
+  $("#tiles").innerHTML=`
+    <div class="tile"><div class="k">当前心情</div><div class="v">${d.mood.valence>=0?"+":""}${d.mood.valence} / ${d.mood.arousal}</div><div class="s">愉悦度/唤醒度 ${esc(d.mood.reason.slice(0,20))}</div></div>
+    <div class="tile"><div class="k">今日打分流</div><div class="v">${s.total}</div><div class="s">通过 ${s.passed} · 均分 ${s.avg}</div></div>
+    <div class="tile"><div class="k">今日目的（动机池）</div><div class="v">${p.count_today??0}<span style="font-size:14px" class="muted">/${p.daily_max??"4"}</span></div><div class="s">惦记中 ${p.pending_n??0} 条 · 素材不足不出门</div></div>
+    <div class="tile"><div class="k">今日预算</div><div class="v" style="color:${tierColor(b.tier)}">¥${b.used??0}<span style="font-size:14px" class="muted">/${(b.daily??0)>0?"¥"+b.daily:"不限"}</span></div><div class="s">${tierLabel(b.tier)}</div></div>
+    <div class="tile"><div class="k">自我认知条目</div><div class="v">${d.entries.total}</div><div class="s">其中经验 ${d.entries.experience} 条</div></div>
+    <div class="tile"><div class="k">群像</div><div class="v">${d.impressions}</div><div class="s">个群已建档</div></div>
+    <div class="tile"><div class="k">交接 memo</div><div class="v">${Object.keys(d.memos).length}</div><div class="s">${Object.entries(d.memos).map(([k,v])=>esc(k.slice(-6)+":"+v)).join(" ")||"无活跃"}</div></div>
+    <div class="tile"><div class="k">突发会话（${d.burst_enabled?"开":"关"}）</div><div class="v">${d.sessions}</div><div class="s">热聊会话池</div></div>
+    <div class="tile"><div class="k">自动备份</div><div class="v">${bk.count??0}</div><div class="s">${bk.latest_name?esc(bk.latest_name).slice(0,24)+" · "+ago(bk.latest_time):"暂无备份"}</div></div>`;
+  $("#lastRefresh").textContent="更新于 "+new Date().toLocaleTimeString("zh-CN",{hour12:false});
+}
+
+/* ---------- 板块总览 ---------- */
+async function loadModules(){
+  const d=await api("/api/k/modules_status");
+  if(!d.ok){$("#content").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const cards=(d.modules||[]).map(m=>{
+    const s=Math.floor(Date.now()/1000-m.last_active);
+    const st=s<300?"活跃":(s<3600?"待机":"沉睡");
+    const cls=s<300?"g":(s<3600?"y":"");
+    return `<div class="card" style="margin:0;cursor:pointer" onclick="openLog('${esc(m.module)}')">
+      <h3 style="margin:0">${esc(m.module)} <span class="badge ${cls}">${st}</span></h3>
+      <div class="statline">${ago(m.last_active)} · ${m.size_kb} KB</div></div>`;
+  }).join("");
+  $("#content").innerHTML=
+    `<div class="card"><h3>全部板块运行脉搏</h3><div class="statline">点任意板块卡直达它的日志流 · 活跃=5分钟内有动静 / 待机=1小时内 / 沉睡=更久</div></div>
+     <div class="imp-grid">${cards}</div>`;
+}
+function openLog(mod){
+  logModule=mod;localStorage.setItem("k_logmod",mod);
+  document.querySelector('.tab[data-tab="logs"]').click();
+}
+
+/* ---------- 打分流 ---------- */
+async function loadScores(){
+  const days=+(localStorage.getItem("k_days")||1);
+  const d=await api("/api/k/scores?days="+days);
+  const t=await api("/api/k/score_trend?days="+days);
+  const r=await api("/api/k/reason_dist?days="+days);
+  if(!d.ok){$("#content").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const rows=d.events.slice().reverse().map(e=>`<tr>
+    <td>${esc(e.time)}</td><td>${esc(e.group_name||e.stream_id)}</td>
+    <td>${e.passed?'<span class="badge g">通过</span>':'<span class="badge r">拒发</span>'}</td>
+    <td><b>${e.score}</b></td><td>${esc(e.reply_head)}</td><td class="muted">${esc(e.reason)}</td></tr>`).join("");
+  const grows=d.groups.map(g=>`<tr><td>${esc(g.group)}</td><td>${g.total}</td><td>${g.passed}</td><td>${g.avg}</td></tr>`).join("");
+  const trendHtml=(t.ok&&t.trend.length)?lineChart([
+    {name:"均分",color:"var(--brand)",points:t.trend.map(x=>({x:x.t,y:x.avg}))},
+    {name:"通过率%",color:"#80c1ff",points:t.trend.map(x=>({x:x.t,y:x.pass_rate}))}
+  ]):'<div class="muted">暂无趋势数据</div>';
+  const distHtml=(r.ok&&r.rejected>0)?hBars(r.dist):'<div class="muted">暂无拒发记录</div>';
+  $("#content").innerHTML=`
+    <div class="card"><h3>拟真质量趋势（近 ${d.days} 天）</h3>${trendHtml}</div>
+    <div class="card"><h3>拒发原因分布（共 ${r.ok?r.rejected:0} 条被拒）</h3>${distHtml}</div>
+    <div class="card"><h3>打分明细（近 ${d.days} 天）</h3>
+      <div class="row" style="margin-bottom:8px">
+        <span class="statline">共 <b>${d.total}</b> 条 · 通过率 <b>${d.pass_rate}%</b> · 均分 <b>${d.avg}</b></span>
+        <select id="daySel">${[1,2,3,7].map(x=>`<option value="${x}" ${x==days?"selected":""}>近${x}天</option>`).join("")}</select>
+        <button class="btn" onclick="actionCleanup()">清理过期</button>
+      </div>
+      <table><tr><th>时间</th><th>群</th><th>结果</th><th>分</th><th>回复</th><th>审核理由</th></tr>${rows||'<tr><td colspan="6" class="muted">暂无记录</td></tr>'}</table>
+    </div>
+    <div class="card"><h3>按群统计</h3><table><tr><th>群</th><th>条数</th><th>通过</th><th>均分</th></tr>${grows}</table></div>`;
+  $("#daySel").onchange=e=>{localStorage.setItem("k_days",e.target.value);loadScores();};
+}
+
+/* ---------- 群像 ---------- */
+async function loadImpressions(){
+  const d=await api("/api/k/impressions");
+  if(!d.ok){$("#content").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const data=d.data||{};
+  const cards=Object.entries(data).map(([sid,imp])=>{
+    const fields=[
+      ["group_type","类型",imp.group_type||"",false],
+      ["atmosphere","氛围",imp.atmosphere||"",false],
+      ["my_attitude","策略档",imp.my_attitude||2,true],
+      ["topics","主题",(imp.topics||[]).join("、"),true],
+      ["quirks","注意",(imp.quirks||[]).join("；"),true],
+    ].map(([f,label,val,isList])=>`
+      <div class="field"><span class="fk">${label}</span>
+        ${f==="my_attitude"
+          ?`<select data-f="${f}">${[1,2,3,4,5].map(x=>`<option value="${x}" ${x==val?"selected":""}>${x}</option>`).join("")}</select>`
+          :`<input data-f="${f}" value="${esc(val)}">`}
+      </div>`).join("");
+    return `<div class="card" data-sid="${esc(sid)}">
+      <h3>${esc(imp.group_name||sid)} <span class="badge">${esc(sid.slice(-8))}</span></h3>
+      ${fields}
+      <div class="row" style="margin-top:8px">
+        <button class="btn" onclick="saveImp('${esc(sid)}',this)">保存修改</button>
+        <button class="btn" onclick="reviewNow('${esc(sid)}')">立即审查</button>
+        <button class="btn" onclick="impHistory('${esc(sid)}',this)">演变</button>
+        <span class="auto">证据: ${esc(imp.evidence||"-").slice(0,60)} · ${ago(imp.updated)}</span>
+      </div></div>`;
+  }).join("");
+  $("#content").innerHTML=cards||'<div class="card muted">还没有群像，等层2每日审查跑起来（4点档）</div>';
+}
+async function saveImp(sid,btn){
+  const card=btn.closest(".card");
+  const fields=["group_type","atmosphere","my_attitude","topics","quirks"];
+  for(const f of fields){
+    const el=card.querySelector(`[data-f="${f}"]`);if(!el)continue;
+    let v=el.value;
+    if(f==="my_attitude")v=+v;
+    if(f==="topics"||f==="quirks")v=v.split(/[、;；]/).map(x=>x.trim()).filter(Boolean);
+    const r=await post("/api/k/impressions/set",{stream_id:sid,field:f},{stream_id:sid,field:f,value:v});
+    if(!r.ok){toast(r.msg||r.error,false);return;}
+  }
+  toast("群像已保存");loadImpressions();
+}
+async function reviewNow(sid){
+  const r=await post("/api/k/action/review",{stream_id:sid});
+  toast(r.msg||r.error||"已触发",r.ok!==false);loadImpressions();
+}
+async function impHistory(sid,btn){
+  const card=btn.closest(".card");
+  const old=card.querySelector(".imp-hist");
+  if(old){old.remove();return;}
+  const d=await api("/api/k/imp_history?stream_id="+encodeURIComponent(sid));
+  const items=(d.items||[]).slice().reverse().map(x=>`<div class="auto">${esc(x.time)} · <b>${esc(x.op)}</b> · ${esc(JSON.stringify(x.detail||{}).slice(0,150))}</div>`).join("")||'<div class="muted">暂无演变记录</div>';
+  const div=document.createElement("div");
+  div.className="imp-hist";div.style.cssText="border-top:1px solid var(--line);margin-top:8px;padding-top:6px";
+  div.innerHTML=`<h3>认知演变（journal 时间线）</h3>${items}`;
+  card.appendChild(div);
+}
+
+/* ---------- 自我认知 ---------- */
+async function loadEntries(){
+  const d=await api("/api/k/entries");
+  const j=await api("/api/k/journal?limit=40");
+  if(!d.ok){$("#content").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const rows=(d.entries||[]).slice().reverse().map(e=>{
+    const isExp=(e.content||"").startsWith("[经验]");
+    return `<div class="entry"><span class="cat ${isExp?"exp":""}">${isExp?"经验":"认知"}</span>
+      <div style="flex:1">${esc(e.content)}<div class="auto">${ago(e.added)} · 鲜活锚点 ${ago(e.anchor)} · 被想起${e.hits||0}次</div></div>
+      <button class="btn danger" onclick="delEntry('${esc(e.content)}')">删</button></div>`;
+  }).join("");
+  const jr=(j.items||[]).slice().reverse().map(x=>`<tr><td>${esc(x.time)}</td><td>${esc(x.op)}</td><td class="muted">${esc(JSON.stringify(x.detail||x).slice(0,120))}</td></tr>`).join("");
+  $("#content").innerHTML=`
+    <div class="card"><h3>活跃条目（归档区另有 ${d.archive_count} 条）</h3>${rows||'<div class="muted">暂无</div>'}</div>
+    <div class="card"><h3>变更审计（journal）</h3><table><tr><th>时间</th><th>操作</th><th>明细</th></tr>${jr}</table></div>`;
+}
+async function delEntry(content){
+  if(!confirm("删除这条认知？（进归档区，可恢复）"))return;
+  const r=await post("/api/k/entries/delete",{},{content});
+  toast(r.msg||r.error||"完成",r.ok!==false);loadEntries();
+}
+
+/* ---------- 实时状态 ---------- */
+async function loadLive(){
+  const m=await api("/api/k/mood");
+  const mc=await api("/api/k/mood_curve");
+  const mm=await api("/api/k/memos");
+  const s=await api("/api/k/sessions");
+  const pp=await api("/api/k/purpose");
+  const bd=await api("/api/k/budget");
+  const moodCard=`<div class="card"><h3>当前心情</h3>
+    <div class="tile" style="border:none;padding:0"><div class="v">愉悦 ${m.valence} / 唤醒 ${m.arousal}</div><div class="s">${esc(m.reason||"无最近波动理由")}</div></div></div>`;
+  const curveHtml=(mc.ok&&mc.series&&mc.series.length)?lineChart([
+    {name:"愉悦度",color:"var(--brand)",points:mc.series.map(p=>({x:p.t,y:p.v}))},
+    {name:"唤醒度",color:"#80c1ff",points:mc.series.map(p=>({x:p.t,y:p.a}))}
+  ]):'<div class="muted">暂无心情时间线（等心情系统打点，每分钟一条）</div>';
+  const memoCards=Object.entries(mm.data||{}).map(([sid,x])=>`
+    <div class="card"><h3>${esc(sid.slice(-10))} <span class="badge ${x.status==="ready"?"g":"y"}">${esc(x.status)}</span></h3>
+    <div>${esc(x.text||"")}</div><div class="auto">落于 ${ago(x.created)}</div></div>`).join("");
+  const sesCards=(s.data||[]).map(x=>`
+    <div class="card"><h3>${esc(x.stream_id.slice(-10))} <span class="badge">${x.turns}轮</span> ${x.compacting?'<span class="badge y">压缩中</span>':""}</h3>
+    <div class="statline">约 ${x.est_tokens} token · ${ago(x.last_active)}活跃</div><div class="muted">${esc(x.tail)}</div></div>`).join("");
+  const memoDbg=`<div class="row" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">
+    <input id="dbgMemoSid" placeholder="stream_id（从群像卡复制）" style="flex:1;min-width:180px">
+    <input id="dbgMemoText" placeholder="调试 memo 内容" style="flex:2;min-width:200px">
+    <button class="btn" onclick="pushMemo()">塞测试memo</button></div>`;
+  // M3.2 动机池卡（S1/S3）
+  let purposeHtml='<div class="muted">动机池还没跑过——等第一次主动掷骰命中</div>';
+  if(pp.ok){
+    const pend=(pp.pending||[]).map(p=>`
+      <div class="field" style="${p.expired?"opacity:.45":""}">
+        <span class="fk">${p.expired?'<span class="badge">过期</span>':`<span class="badge ${p.source==="收尾惦记"?"y":"g"}">${esc(p.source)}</span>`}</span>
+        <div style="flex:1">${esc(p.summary||"")}${p.next_opening?`<span class="muted"> · 接法：${esc(p.next_opening)}</span>`:""}</div>
+        <span class="auto muted">带出门${p.hits}次 · 剩${p.remain_days}天${p.origin?" · 群"+esc(p.origin):""}</span>
+      </div>`).join("");
+    const hist=(pp.history||[]).slice().reverse().map(h=>`
+      <div class="muted" style="font-size:12px">· ${esc(h.time)} ${h.outcome==="sent"?'<span class="badge g">sent</span>':'<span class="badge">silent</span>'} ${esc(h.summary)}</div>`).join("");
+    const clos=Object.entries(pp.closure_at||{}).map(([sid,t])=>`<span class="badge">${esc(sid)} 收尾于 ${esc(t)}</span>`).join(" ");
+    purposeHtml=`
+      <div class="row"><span class="statline">今日带目的出门 <b>${pp.count_today}/${pp.daily_max}</b> · 纯冲浪降级 <b>${pp.browse_today}/${pp.browse_max}</b></span>
+      <span class="auto muted">pending 保质 ${pp.pending_ttl_days} 天 · 收尾冷却 ${pp.closure_cooldown_min} 分钟</span></div>
+      ${pend?`<div style="margin-top:6px"><b style="font-size:13px">惦记池</b>${pend}</div>`:'<div class="muted" style="margin-top:6px">惦记池空——她没有攒着的念头</div>'}
+      ${hist?`<div style="margin-top:6px"><b style="font-size:13px">出门流水</b>${hist}</div>`:""}
+      ${clos?`<div class="auto" style="margin-top:6px">${clos}</div>`:""}`;
+  }else purposeHtml=`<div class="muted">加载失败：${esc(pp.error||"")}</div>`;
+  // M3.2 预算卡（S2）
+  let budgetHtml='<div class="muted">预算闸门未加载</div>';
+  if(bd.ok){
+    const pct=(bd.daily>0)?Math.min(100,Math.round(bd.used/bd.daily*100)):0;
+    const col=tierColor(bd.tier);
+    const bar=bd.daily>0?`<div style="background:var(--card2);border-radius:6px;margin:6px 0"><div style="width:${pct}%;background:${col};border-radius:6px;padding:2px 6px;color:#111;font-size:12px">${pct}%</div></div>`:'<div class="muted" style="margin:6px 0">未设预算（daily_cny=0 不限），记账照常</div>';
+    budgetHtml=`
+      <div class="row"><span class="statline">今日已用 <b style="color:${col}">¥${bd.used}</b> / ${bd.daily>0?"¥"+bd.daily:"不限"}</span>
+      <span class="badge" style="color:${col};border-color:${col}">${tierLabel(bd.tier)}</span></div>
+      ${bar}
+      <div class="muted" style="font-size:12px">输入 ${bd.in_tokens} tok · 输出 ${bd.out_tokens} tok · 熔断线 ${Math.round(bd.ratio*100)}%${bd.alert?` · 80%提醒已于 ${esc(bd.alert.day)} 落盘`:""}</div>
+      <div class="auto muted" style="margin-top:4px">数据源 data/token_usage.jsonl（S2 记账旁路）；历史账单见「报错&账单」页</div>`;
+  }else budgetHtml=`<div class="muted">加载失败：${esc(bd.error||"")}</div>`;
+  $("#content").innerHTML=
+    moodCard+
+    `<div class="card"><h3>今日预算闸门（S2，可在系统配置页热改预算）</h3>${budgetHtml}</div>`+
+    `<div class="card"><h3>动机池（S1：她自己想干的事 + S3 收尾惦记）</h3>${purposeHtml}</div>`+
+    `<div class="card"><h3>心情心电图（绝对值时间线）</h3>${curveHtml}</div>`+
+    `<div class="card"><h3>交接 memo（一次性，发言即亡）</h3>${memoCards||'<div class="muted">当前无活跃 memo</div>'}${memoDbg}</div>`+
+    `<div class="card"><h3>突发会话池（仅白名单群且 burst_session 开启时活动）</h3>${sesCards||'<div class="muted">空</div>'}</div>`;
+}
+async function pushMemo(){
+  const sid=$("#dbgMemoSid").value.trim(),text=$("#dbgMemoText").value.trim();
+  if(!sid||!text){toast("要填 stream_id 和内容",false);return;}
+  const r=await post("/api/k/action/memo",{stream_id:sid},{stream_id:sid,text});
+  toast(r.msg||r.error||"完成",r.ok!==false);loadLive();
+}
+
+/* ---------- 报错&账单 ---------- */
+async function loadErrBills(){
+  const e=await api("/api/k/errors");
+  const b=await api("/api/k/bills?days=7");
+  const bd=await api("/api/k/budget");
+  const errRows=(e.errors||[]).map(x=>`<tr><td>${esc(x.module)}</td><td class="muted">${esc(x.line)}</td></tr>`).join("");
+  const errHtml=errRows?`<table><tr><th>模块</th><th>内容</th></tr>${errRows}</table>`:'<div class="muted">✅ 各模块日志尾部没有报错行</div>';
+  const fmtK=n=>{n=+n||0;return n>=1000?(n/1000).toFixed(1)+"k":n;};
+  const billRows=(b.by_day||[]).map(x=>`<tr><td>${esc(x.day)}</td><td>¥${x.cost}</td><td>${x.n}</td><td>${fmtK(x.tokens)}</td></tr>`).join("");
+  // M3.2 今日预算条（S2 实时账本，与下方 db.llm_usage 历史账单是两套账：前者闸门用，后者对账基准）
+  let budgetBar="";
+  if(bd.ok&&bd.daily>0){
+    const pct=Math.min(100,Math.round(bd.used/bd.daily*100)),col=tierColor(bd.tier);
+    budgetBar=`<div class="row" style="margin-bottom:8px"><span class="statline">今日（S2 实时账本）：<b style="color:${col}">¥${bd.used}</b> / ¥${bd.daily}</span>
+      <span class="badge" style="color:${col};border-color:${col}">${tierLabel(bd.tier)}</span>
+      <div style="flex:1;background:var(--card2);border-radius:6px;min-width:120px"><div style="width:${pct}%;background:${col};border-radius:6px;height:10px"></div></div></div>`;
+  }else if(bd.ok) budgetBar='<div class="statline" style="margin-bottom:8px">今日（S2 实时账本）：¥'+bd.used+' · 未设预算（不限）</div>';
+  $("#content").innerHTML=`
+    <div class="card"><h3>报错扫描（各模块日志尾部）</h3>${errHtml}</div>
+    <div class="card"><h3>Token 账单（近7天，共 ¥${b.total??0}）</h3>
+      ${budgetBar}
+      <table><tr><th>日期</th><th>成本</th><th>请求数</th><th>tokens</th></tr>${billRows||'<tr><td colspan="4" class="muted">暂无数据</td></tr>'}</table>
+      <div class="auto muted" style="margin-top:4px">上表聚合 MongoDB llm_usage（历史对账基准）；S2 闸门的实时账本在「实时状态」页</div>
+      <h3 style="margin-top:10px">按模型成本</h3>${hBars(b.by_model||[],"var(--brand)")}
+      <h3 style="margin-top:10px">按请求类型</h3>${hBars(b.by_type||[],"#80c1ff")}
+    </div>`;
+}
+
+/* ---------- 反思报告 ---------- */
+async function loadReflections(pick){
+  const d=await api("/api/k/reflections");
+  const sc=await api("/api/k/scores?days=1");
+  if(!d.ok){$("#content").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const linkHtml=`<div class="statline">🔗 数据链路：昨日打分 <b>${sc.ok?sc.total:0}</b> 条（证据）→ 反思提炼 → [经验] 沉淀进自我认知 → 每轮注入 prompt</div>`;
+  const name=pick||(d.files||[])[0]||"";
+  const c=name?(await api("/api/k/reflection?name="+encodeURIComponent(name))):{content:"（还没有反思报告，等次日5点或手动触发）"};
+  const btns=(d.files||[]).map(f=>`<button class="btn" onclick="loadReflections('${f}')">${f}</button>`).join(" ");
+  $("#content").innerHTML=`
+    <div class="card"><h3>反思报告</h3>
+      ${linkHtml}
+      <div class="row" style="margin-bottom:8px">${btns||'<span class="muted">暂无</span>'}
+      <button class="btn" onclick="triggerReflect()">手动触发反思</button></div>
+      <pre>${esc(c.content||"")}</pre></div>`;
+}
+async function triggerReflect(){
+  if(!confirm("手动触发一次每日反思？（会调一次32B，沉淀经验条目）"))return;
+  const r=await post("/api/k/action/reflect");
+  toast(JSON.stringify(r.result||r.error||r),r.ok!==false);loadReflections();
+}
+
+/* ---------- 日志流 ---------- */
+let logTimer=null,logModule=localStorage.getItem("k_logmod")||"other";
+async function loadLogs(){
+  const lines=+(localStorage.getItem("k_loglines")||120);
+  const mods=await api("/api/k/log_modules");
+  const d=await api("/api/k/logs?module="+encodeURIComponent(logModule)+"&lines="+lines);
+  const cmp=await loadCompare();
+  $("#content").innerHTML=`
+    <div class="card"><h3>日志流
+      <select id="logSel">${(mods.modules||[]).map(m=>`<option ${m===logModule?"selected":""}>${m}</option>`).join("")}</select>
+      <select id="lineSel">${[60,120,300].map(x=>`<option value="${x}" ${x===lines?"selected":""}>${x}行</option>`).join("")}</select>
+      <button class="btn" onclick="addCompare()">+加入对比</button>
+      <button class="btn" onclick="clearCompare()">清对比</button>
+      <span class="auto">5s 自动刷新 · 当前文件: ${esc(d.file||"")}</span></h3>
+      <pre>${esc((d.lines||[]).join("\n"))||"（空）"}</pre>${cmp}</div>`;
+  $("#logSel").onchange=e=>{logModule=e.target.value;localStorage.setItem("k_logmod",logModule);loadLogs();};
+  $("#lineSel").onchange=e=>{localStorage.setItem("k_loglines",e.target.value);loadLogs();};
+  clearTimeout(logTimer);
+  if(curTab==="logs")logTimer=setTimeout(()=>{if(curTab==="logs")loadLogs();},5000);
+}
+async function loadCompare(){
+  const arr=JSON.parse(localStorage.getItem("k_compare")||"[]");
+  if(!arr.length)return "";
+  const ps=await Promise.all(arr.map(m=>api("/api/k/logs?module="+encodeURIComponent(m)+"&lines=60")));
+  return `<div class="imp-grid">${ps.map((d,i)=>`<div><div class="statline">对比·${esc(arr[i])}</div><pre style="max-height:260px">${esc((d.lines||[]).join("\n"))||"（空）"}</pre></div>`).join("")}</div>`;
+}
+function addCompare(){
+  const arr=JSON.parse(localStorage.getItem("k_compare")||"[]");
+  if(!arr.includes(logModule)){arr.push(logModule);localStorage.setItem("k_compare",JSON.stringify(arr.slice(-2)));}
+  loadLogs();
+}
+function clearCompare(){localStorage.setItem("k_compare","[]");loadLogs();}
+
+/* ---------- 系统配置（白名单热改 + 只读全量） ---------- */
+async function loadSysConfig(){
+  const d=await api("/api/k/config");
+  const ed=await api("/api/k/config_editable");
+  let editHtml="";
+  if(ed.ok){
+    editHtml=Object.entries(ed.editable||{}).map(([sec,keys])=>{
+      const rows=Object.entries(keys).map(([k,meta])=>{
+        const hot=meta.hot?'<span class="badge g">立即生效</span>':'<span class="badge">重启生效</span>';
+        const cur=meta.value;
+        let input;
+        if(meta.kind==="bool"){
+          const v=String(cur)==="true";
+          input=`<select data-k="${esc(k)}"><option value="true" ${v?"selected":""}>true</option><option value="false" ${!v?"selected":""}>false</option></select>`;
+        }else{
+          input=`<input data-k="${esc(k)}" value="${esc(String(cur??""))}">`;
+        }
+        const rng=meta.range?`<span class="auto">[${meta.range[0]}~${meta.range[1]}]</span>`:"";
+        return `<div class="field"><span class="fk">${esc(meta.label)}</span>${input}<button class="btn" onclick="saveCfg('${esc(sec)}','${esc(k)}',this)">存</button>${hot}${rng}</div>
+                <div class="auto" style="margin:-2px 0 6px 96px">${esc(meta.desc)}<span class="muted"> · 键: ${esc(k)}</span></div>`;
+      }).join("");
+      return `<div class="card"><h3>[${esc(sec)}]</h3>${rows}</div>`;
+    }).join("");
+  }
+  const sections=Object.entries(d.data||{}).map(([sec,vals])=>{
+    if(typeof vals!=="object"||vals===null)return "";
+    const rows=Object.entries(vals).map(([k,v])=>{
+      let vv=typeof v==="boolean"?(v?"true":"false"):JSON.stringify(v);
+      if(vv&&vv.length>100)vv=vv.slice(0,100)+"…";
+      return `<tr><td class="muted" style="width:40%">${esc(k)}</td><td>${esc(vv)}</td></tr>`;
+    }).join("");
+    return `<div class="card"><h3>[${esc(sec)}]</h3><table><tr><th>键</th><th>值</th></tr>${rows}</table></div>`;
+  }).join("");
+  $("#content").innerHTML=`<div class="card"><h3>配置热改（白名单标量 · 注释保留 · 写前校验）</h3><div class="statline">带"立即生效"的保存即热应用；其余改 toml 后需重启</div></div>${editHtml}<div class="card"><h3>bot_config.toml 全量只读</h3><div class="statline">${esc(d.path||"")}</div></div>${sections}`;
+}
+async function saveCfg(sec,key,btn){
+  const wrap=btn.closest(".field");
+  const el=wrap.querySelector("input,select");
+  const r=await post("/api/k/config/set",{section:sec,key:key},{section:sec,key:key,value:el.value});
+  toast(r.msg||r.error||"完成",r.ok!==false);
+  if(r.ok)loadSysConfig();
+}
+
+/* ---------- 记忆档案（方案L二期A：人物卡可编辑 + 情节卡时间线 + 世界卡） ---------- */
+async function loadCards(){
+  const [pc,ec,wc]=await Promise.all([api("/api/k/person_cards"),api("/api/k/episodic_cards?limit=200"),api("/api/k/world_cards")]);
+  let html="";
+  const cards=(pc.cards||[]);
+  html+=`<div class="card"><div class="row"><b>人物卡</b><span class="auto muted">${cards.length} 张 · 她对每个人的档案（印象/相处可直接改，保存需 token）</span></div></div>`;
+  if(!pc.ok) html+=`<div class="card muted">加载失败：${esc(pc.error||"")}</div>`;
+  else if(!cards.length) html+=`<div class="card muted">还没有人物卡——凌晨归档跑完后出现；一直空的话检查 [person_cards] enable 是否已开</div>`;
+  else html+=cards.map(c=>`
+    <div class="card">
+      <div class="row"><b>${esc(c.name)}</b><span class="auto muted">QQ ${esc(c.qq)} · ${c.events_count} 事件 · 更新于 ${ago(c.updated_at)}</span></div>
+      <div class="field"><span class="fk">印象</span><input id="pc_imp_${esc(c.qq)}" value="${esc(c.impression)}"><button class="btn" onclick="saveCardField('${esc(c.qq)}','impression')">存</button></div>
+      <div class="field"><span class="fk">相处</span><input id="pc_itr_${esc(c.qq)}" value="${esc(c.interaction)}"><button class="btn" onclick="saveCardField('${esc(c.qq)}','interaction')">存</button></div>
+      <div class="field"><span class="fk">雷点</span><span>${esc((c.pet_peeves||[]).join("、"))||'<span class="muted">暂无</span>'}</span></div>
+      ${(c.events||[]).slice(-3).reverse().map(e=>`<div class="muted" style="font-size:12px;margin-left:8px">· (${esc(e.date||"")}) ${esc(e.text||"")}</div>`).join("")}
+    </div>`).join("");
+  const eps=(ec.cards||[]);
+  html+=`<div class="card"><div class="row"><b>情节卡（共同回忆时间线）</b><span class="auto muted">${eps.length} 张（最新在前，只读）</span></div></div>`;
+  if(!ec.ok) html+=`<div class="card muted">加载失败：${esc(ec.error||"")}</div>`;
+  else if(!eps.length) html+=`<div class="card muted">还没有情节卡——出现"梗的诞生/关系里程碑"级别的日子才会建卡，宁缺毋滥</div>`;
+  else html+=eps.map(e=>`
+    <div class="card">
+      <div class="row"><b>${esc(e.date||"")}</b><span class="auto"><span class="badge">重要度 ${esc(String(e.importance??"?"))}</span>${e.chat_id?`<span class="muted"> 群 ${esc(String(e.chat_id).slice(-6))}</span>`:""}</span></div>
+      <div>${esc(e.text||"")}</div>
+      ${e.evidence?`<div class="muted" style="font-size:12px;margin-top:4px">依据：${esc(e.evidence)}</div>`:""}
+    </div>`).join("");
+  // P4 世界卡：她上网学到的事实知识（闲逛时按话题联想注入）
+  const wcs=(wc.cards||[]);
+  html+=`<div class="card"><div class="row"><b>世界卡（她知道的事）</b><span class="auto muted">${wc.ok?wcs.length+" / "+(wc.total??wcs.length)+" 张（容量上限200，按话题查重覆盖，闲逛时联想注入）":"只读"}</span></div></div>`;
+  if(!wc.ok) html+=`<div class="card muted">加载失败：${esc(wc.error||"")}</div>`;
+  else if(!wcs.length) html+=`<div class="card muted">还没有世界卡——她在闲逛/搜索中学到新东西后自动沉淀</div>`;
+  else html+=wcs.map(c=>`
+    <div class="card">
+      <div class="row"><b>${esc(c.topic||"")}</b><span class="auto muted">${c.source?`来源 ${esc(c.source)} · `:""}学到于 ${ago(c.created_at)}${c.last_recalled?` · 上次想起 ${ago(c.last_recalled)}`:""}</span></div>
+      <div>${esc(c.text||"")}</div>
+    </div>`).join("");
+  $("#content").innerHTML=html;
+}
+async function saveCardField(qq,field){
+  const input=$("#pc_"+(field==="impression"?"imp":"itr")+"_"+qq);
+  const body={qq,[field]:input?input.value:""};
+  const r=await post("/api/k/person_cards/update",{},body);
+  toast(r.ok?"已保存":"保存失败："+(r.error||""),!!r.ok);
+  if(r.ok)loadCards();
+}
+
+/* ---------- 记忆&数据库（分类视图） ---------- */
+let dbPage=1,dbQ="",msgPage=1,msgQ="",dbView="memory";
+async function loadDB(){
+  const ov=await api("/api/k/db/overview");
+  const counts=ov.counts||{};
+  const countStr=Object.entries(counts).map(([k,v])=>`<span class="badge">${esc(k)}:${v}</span>`).join(" ");
+  const sub=[["memory","海马体图谱"],["person","用户印象"],["schedule","今日日程"],["messages","消息记录"]]
+    .map(([v,l])=>`<span class="tab ${dbView===v?"on":""}" onclick="setDBView('${v}')" style="padding:4px 10px;font-size:12px">${l}</span>`).join("");
+  $("#content").innerHTML=`<div class="card"><h3>集合概览（MongoDB）</h3><div class="row">${countStr}</div>
+    <div class="tabs" style="margin:10px 0 0">${sub}</div></div><div id="dbViewBox"></div>`;
+  await loadDBView();
+}
+function setDBView(v){dbView=v;loadDBView();}
+async function loadDBView(){
+  if(dbView==="memory")await loadDBMem();
+  else if(dbView==="person")await loadDBPerson();
+  else if(dbView==="schedule")await loadDBSchedule();
+  else await loadDBMsg();
+}
+async function loadDBMem(){
+  const d=await api(`/api/k/db/memory?q=${encodeURIComponent(dbQ)}&page=${dbPage}`);
+  if(!d.ok){$("#dbViewBox").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const rows=d.items.map(x=>{
+    const items=(x.memory_items||[]).map(esc).join("<br>");
+    return `<tr data-id="${esc(x.id)}">
+      <td style="width:22%"><b>${esc(x.concept)}</b><div class="auto">${ago(x.last_modified)}</div></td>
+      <td class="mem-items">${items}</td>
+      <td style="width:120px"><button class="btn" onclick="editMem('${esc(x.id)}',this)">编辑</button>
+      <button class="btn danger" onclick="delMem('${esc(x.id)}')">删</button></td></tr>`;
+  }).join("");
+  const pg=`<div class="row" style="margin-top:8px"><button class="btn" onclick="dbPage=Math.max(1,dbPage-1);loadDBMem()">上一页</button><span class="auto">第 ${d.page} 页 / 共 ${d.total} 条</span><button class="btn" onclick="dbPage++;loadDBMem()">下一页</button></div>`;
+  $("#dbViewBox").innerHTML=`<div class="card"><h3>海马体记忆图谱（可编辑）</h3>
+    <div class="row" style="margin-bottom:8px"><input id="memQ" placeholder="搜索概念…" value="${esc(dbQ)}" style="flex:1"><button class="btn" onclick="dbQ=$('#memQ').value;dbPage=1;loadDBMem()">搜索</button></div>
+    <table><tr><th>概念</th><th>记忆内容</th><th>操作</th></tr>${rows||'<tr><td colspan="3" class="muted">暂无</td></tr>'}</table>${pg}</div>`;
+  const q=$("#memQ");if(q)q.onkeydown=e=>{if(e.key==="Enter"){dbQ=$("#memQ").value;dbPage=1;loadDBMem();}};
+}
+function editMem(id,btn){
+  const tr=btn.closest("tr");
+  const cell=tr.querySelector(".mem-items");
+  const lines=cell.innerHTML.split("<br>").map(s=>s.trim()).filter(Boolean);
+  const ta=document.createElement("textarea");
+  ta.style.cssText="width:100%;min-height:80px;font-size:12px";
+  ta.value=lines.join("\n");
+  cell.innerHTML="";cell.appendChild(ta);
+  btn.textContent="保存";
+  btn.onclick=async()=>{
+    const items=ta.value.split("\n").map(s=>s.trim()).filter(Boolean);
+    const r=await post("/api/k/db/memory/update",{id:id},{id:id,memory_items:items});
+    toast(r.msg||r.error||"完成",r.ok!==false);
+    if(r.ok)loadDBMem();
+  };
+}
+async function delMem(id){
+  if(!confirm("删除整个记忆节点？（含全部记忆内容，journal 留痕）"))return;
+  const r=await post("/api/k/db/memory/delete",{id:id},{id:id});
+  toast(r.msg||r.error||"完成",r.ok!==false);
+  if(r.ok)loadDBMem();
+}
+async function loadDBPerson(){
+  const d=await api(`/api/k/person_info?q=${encodeURIComponent(dbQ)}`);
+  if(!d.ok){$("#dbViewBox").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const rows=d.items.map(x=>{
+    const known=x.konw_time>0?ago(x.konw_time):"未知";
+    return `<tr data-pid="${esc(x.person_id)}">
+      <td style="width:26%"><b>${esc(x.name)}</b><div class="auto">${known}认识 · 约${x.msg_interval/1000|0}s/条</div></td>
+      <td style="width:30%"><input data-v="${x.relationship_value}" value="${x.relationship_value}"></td>
+      <td><button class="btn" onclick="savePerson('${esc(x.person_id)}',this)">存好感</button>
+      <span class="auto">负=冷淡 正=亲密</span></td></tr>`;
+  }).join("");
+  const pg=`<div class="row" style="margin-top:8px"><button class="btn" onclick="dbPage=Math.max(1,dbPage-1);loadDBPerson()">上一页</button><span class="auto">第 ${d.page} 页 / 共 ${d.total} 人</span><button class="btn" onclick="dbPage++;loadDBPerson()">下一页</button></div>`;
+  $("#dbViewBox").innerHTML=`<div class="card"><h3>用户印象（好感度即时生效 · 她的热情跟着这个走）</h3>
+    <div class="row" style="margin-bottom:8px"><input id="personQ" placeholder="搜索名字…" value="${esc(dbQ)}" style="flex:1"><button class="btn" onclick="dbQ=$('#personQ').value;loadDBPerson()">搜索</button></div>
+    <table><tr><th>人</th><th>好感度</th><th>操作</th></tr>${rows||'<tr><td colspan="3" class="muted">暂无</td></tr>'}</table>${pg}</div>`;
+  const q=$("#personQ");if(q)q.onkeydown=e=>{if(e.key==="Enter"){dbQ=$("#personQ").value;loadDBPerson();}};
+}
+async function savePerson(pid,btn){
+  const tr=btn.closest("tr");
+  const el=tr.querySelector("input");
+  const r=await post("/api/k/db/person/update",{person_id:pid},{person_id:pid,relationship_value:+el.value});
+  toast(r.msg||r.error||"完成",r.ok!==false);
+}
+async function loadDBSchedule(){
+  const d=await api("/api/k/schedule");
+  if(!d.ok){$("#dbViewBox").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const list=(d.tasks||[]).map(t=>`<li>${esc(t)}</li>`).join("");
+  const badge=d.enabled?'<span class="badge g">已启用</span>':'<span class="badge y">未启用（bot_config [schedule]）</span>';
+  $("#dbViewBox").innerHTML=`<div class="card"><h3>今日日程（${esc(d.date)}）${badge}</h3>
+    <ol style="padding-left:20px">${list||'<li class="muted">今天还没有生成日程</li>'}</ol>
+    <div class="auto">只读 · 日程由系统按人设自动生成与更新</div></div>`;
+}
+async function loadDBMsg(){
+  const d=await api(`/api/k/db/messages?q=${encodeURIComponent(msgQ)}&page=${msgPage}`);
+  if(!d.ok){$("#dbViewBox").innerHTML=`<div class="card">${esc(d.error||"")}</div>`;return;}
+  const rows=d.items.map(x=>`<tr><td>${fmtT(x.time)}</td><td style="width:18%">${esc(x.who)}</td><td>${esc(x.text)}</td></tr>`).join("");
+  const pg=`<div class="row" style="margin-top:8px"><button class="btn" onclick="msgPage=Math.max(1,msgPage-1);loadDBMsg()">上一页</button><span class="auto">第 ${d.page} 页 / 共 ${d.total} 条</span><button class="btn" onclick="msgPage++;loadDBMsg()">下一页</button></div>`;
+  $("#dbViewBox").innerHTML=`<div class="card"><h3>消息记录浏览（只读）</h3>
+    <div class="row" style="margin-bottom:8px"><input id="msgQ" placeholder="搜索消息文本…" value="${esc(msgQ)}" style="flex:1"><button class="btn" onclick="msgQ=$('#msgQ').value;msgPage=1;loadDBMsg()">搜索</button></div>
+    <table><tr><th>时间</th><th>谁</th><th>内容</th></tr>${rows||'<tr><td colspan="3" class="muted">暂无</td></tr>'}</table>${pg}</div>`;
+  const q=$("#msgQ");if(q)q.onkeydown=e=>{if(e.key==="Enter"){msgQ=$("#msgQ").value;msgPage=1;loadDBMsg();}};
+}
+
+/* ---------- 动作 ---------- */
+async function actionCleanup(){
+  if(!confirm("清理过期的打分流记录？（保留期按配置，默认30天）"))return;
+  const r=await post("/api/k/action/cleanup");
+  toast("清理 "+(r.removed??"?")+" 条",r.ok!==false);loadScores();
+}
+
+/* ---------- Tab 调度 ---------- */
+const loaders={modules:loadModules,scores:loadScores,impressions:loadImpressions,entries:loadEntries,cards:loadCards,live:loadLive,reflections:loadReflections,logs:loadLogs,errors:loadErrBills,config:loadSysConfig,db:loadDB};
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+  t.classList.add("on");curTab=t.dataset.tab;
+  clearTimeout(logTimer);loaders[curTab]();
+});
+
+loadOverview();loadModules();
+setInterval(()=>{loadOverview();if(curTab==="scores")loadScores();},10000);
+</script>
+</body>
+</html>
